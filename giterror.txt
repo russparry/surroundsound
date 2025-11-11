@@ -1,0 +1,21 @@
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp>cd surroundsoundundsound
+                                                                   sound>git init
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundcuments/School/strat490/firstapp/surroundsound/.git/sound>git init
+Reinitialized existing Git repository in C:/Users/russp/OneDrive/Dosound>cuments/School/strat490/firstapp/surroundsound/.git/
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>git commit -m "foirst one"
+On branch main
+nothing to commit, working tree clean
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>git branch -M main
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>git remote add origin https://github.com/russparry/surroundsound.git
+error: remote origin already exists.
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>git branch -M main
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>git push -u origin main
+remote: Repository not found.
+fatal: repository 'https://github.com/russparry/REPO.git/' not found
+
+C:\Users\russp\OneDrive\Documents\School\strat490\firstapp\surroundsound>
