@@ -1,0 +1,23 @@
+Ok here's the problem, the localhost:3000 link refused to load on my computer. Theres a good chance something is wrong there. Also I don't need to implement the supabase and stripe stuff just yet. let's focus more on functionability, also, how will I be able to test the product on multiple devices with just a localhost link? 
+I can push this stuff to github and then access github from different devices?
+
+Also there's the problem of authentication from spotify and access tokens. 
+
+Look through this website and these categories on the site https://developer.spotify.com/documentation/web-playback-sdk : Getting started
+Concepts
+Spotify Connect
+How-Tos
+Building a Spotify Player inside a Web app
+Reference
+
+Spotify.Player
+
+Events
+
+Errors
+
+Objects.
+
+The site mentions an access token, it looks like i can get a temporary access token for an hour. When making the file point me to where I should put the access token.
+
+Also I am not as familiar with all the language on this website so I may need to be walked through this process step by step and clarified on what they are requiring from me as a spotify user. 
