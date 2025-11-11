@@ -198,23 +198,44 @@ export default function RoomPage() {
     if (!socket || !player || !deviceId) return;
 
     socket.on('play-command', async ({ trackUri, position: pos, timestamp }: any) => {
+      console.log('Received play-command:', { trackUri, position: pos, deviceId });
       const latency = Date.now() - timestamp;
       const adjustedPosition = pos + latency;
 
-      await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          uris: [trackUri],
-          position_ms: adjustedPosition,
-        }),
-      });
+      try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            uris: [trackUri],
+            position_ms: adjustedPosition,
+          }),
+        });
 
-      // Start drift correction
-      startSyncInterval();
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Spotify API Error:', response.status, errorText);
+
+          if (response.status === 404) {
+            alert('Device not found. Please make sure Spotify is connected.');
+          } else if (response.status === 403) {
+            alert('Premium required or device not active. Try refreshing the page.');
+          } else {
+            alert(`Failed to play track: ${response.status}`);
+          }
+          return;
+        }
+
+        console.log('Successfully started playback');
+        // Start drift correction
+        startSyncInterval();
+      } catch (error) {
+        console.error('Error playing track:', error);
+        alert('Failed to play track. Check console for details.');
+      }
     });
 
     socket.on('pause-command', () => {
@@ -300,8 +321,26 @@ export default function RoomPage() {
 
   // Play a track (host only)
   const handlePlayTrack = (track: any) => {
-    if (!isHost || !socket || !deviceId) return;
+    console.log('handlePlayTrack called:', { isHost, socket: !!socket, deviceId, track: track.name });
 
+    if (!isHost) {
+      console.log('Not host, cannot play');
+      return;
+    }
+
+    if (!socket) {
+      console.log('Socket not connected');
+      alert('Not connected to server. Please refresh the page.');
+      return;
+    }
+
+    if (!deviceId) {
+      console.log('Device ID not set');
+      alert('Spotify player not ready yet. Wait for "Connected to Spotify" message.');
+      return;
+    }
+
+    console.log('Emitting play-track event:', { roomCode, trackUri: track.uri });
     socket.emit('play-track', {
       roomCode,
       trackId: track.id,
@@ -387,6 +426,18 @@ export default function RoomPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Debug Info */}
+        {isHost && (
+          <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
+            <p className="text-sm text-gray-700">
+              <strong>Debug Info:</strong> Socket: {isConnected ? '✓' : '✗'} |
+              Device: {deviceId ? '✓' : '✗'} |
+              Player: {player ? '✓' : '✗'} |
+              Ready: {isReady ? '✓' : '✗'}
+            </p>
           </div>
         )}
 
