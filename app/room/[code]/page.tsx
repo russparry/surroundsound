@@ -26,8 +26,8 @@ interface SpotifyPlayer {
   _options: { getOAuthToken: (cb: (token: string) => void) => void; id: string };
 }
 
-namespace Spotify {
-  export class Player implements SpotifyPlayer {
+declare namespace Spotify {
+  class Player implements SpotifyPlayer {
     constructor(options: any);
     connect(): Promise<boolean>;
     disconnect(): void;
