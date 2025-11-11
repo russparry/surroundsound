@@ -90,9 +90,34 @@ export default function RoomPage() {
         volume: 0.8,
       });
 
-      player.addListener('ready', ({ device_id }: { device_id: string }) => {
+      player.addListener('ready', async ({ device_id }: { device_id: string }) => {
         console.log('Ready with Device ID', device_id);
         setDeviceId(device_id);
+
+        // Activate the device by transferring playback to it
+        try {
+          console.log('Activating device...');
+          const activateResponse = await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              device_ids: [device_id],
+              play: false, // Don't start playing, just activate
+            }),
+          });
+
+          if (activateResponse.ok) {
+            console.log('Device activated successfully');
+          } else {
+            console.warn('Device activation returned:', activateResponse.status);
+          }
+        } catch (error) {
+          console.warn('Could not activate device (may still work):', error);
+        }
+
         setIsReady(true);
       });
 
