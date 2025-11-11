@@ -101,6 +101,25 @@ export default function RoomPage() {
         setIsReady(false);
       });
 
+      player.addListener('initialization_error', ({ message }: { message: string }) => {
+        console.error('Initialization Error:', message);
+        alert('Failed to initialize Spotify player. Make sure you have Spotify Premium.');
+      });
+
+      player.addListener('authentication_error', ({ message }: { message: string }) => {
+        console.error('Authentication Error:', message);
+        alert('Spotify authentication failed. Please try logging in again.');
+      });
+
+      player.addListener('account_error', ({ message }: { message: string }) => {
+        console.error('Account Error:', message);
+        alert('Spotify Premium is required to use this app.');
+      });
+
+      player.addListener('playback_error', ({ message }: { message: string }) => {
+        console.error('Playback Error:', message);
+      });
+
       player.addListener('player_state_changed', (state: any) => {
         if (!state) return;
 
@@ -109,7 +128,15 @@ export default function RoomPage() {
         setPosition(state.position);
       });
 
-      player.connect();
+      player.connect().then((success: boolean) => {
+        if (success) {
+          console.log('The Web Playback SDK successfully connected to Spotify!');
+        } else {
+          console.error('The Web Playback SDK could not connect to Spotify');
+          alert('Failed to connect to Spotify. Please make sure you have Spotify Premium and try refreshing the page.');
+        }
+      });
+
       setPlayer(player);
     };
 
@@ -312,7 +339,12 @@ export default function RoomPage() {
             <p className="text-gray-600 mt-2">
               {isHost ? 'You are the host' : 'Listening mode'} | {memberCount} member(s)
             </p>
-            {!isReady && <p className="text-yellow-600 mt-2">Connecting to Spotify...</p>}
+            {!isReady && (
+              <p className="text-yellow-600 mt-2">
+                Connecting to Spotify... (Make sure you have Spotify Premium and check browser console for errors)
+              </p>
+            )}
+            {isReady && <p className="text-green-600 mt-2">✓ Connected to Spotify</p>}
           </div>
           <button
             onClick={() => router.push('/')}
@@ -325,7 +357,7 @@ export default function RoomPage() {
         {/* Current Track */}
         {currentTrack && (
           <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Now Playing</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-gray-900">Now Playing</h2>
             <div className="flex items-center gap-4">
               {currentTrack.album?.images?.[0] && (
                 <img
@@ -335,7 +367,7 @@ export default function RoomPage() {
                 />
               )}
               <div>
-                <p className="text-xl font-bold">{currentTrack.name}</p>
+                <p className="text-xl font-bold text-gray-900">{currentTrack.name}</p>
                 <p className="text-gray-600">
                   {currentTrack.artists?.map((a: any) => a.name).join(', ')}
                 </p>
@@ -361,7 +393,7 @@ export default function RoomPage() {
         {/* Search (host only) */}
         {isHost && (
           <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-2xl font-semibold mb-4">Search & Play</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-gray-900">Search & Play</h2>
             <div className="flex gap-2 mb-4">
               <input
                 type="text"
@@ -369,7 +401,7 @@ export default function RoomPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 placeholder="Search for a song..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
               />
               <button
                 onClick={handleSearch}
@@ -396,7 +428,7 @@ export default function RoomPage() {
                         />
                       )}
                       <div>
-                        <p className="font-semibold">{track.name}</p>
+                        <p className="font-semibold text-gray-900">{track.name}</p>
                         <p className="text-sm text-gray-600">
                           {track.artists.map((a: any) => a.name).join(', ')}
                         </p>
