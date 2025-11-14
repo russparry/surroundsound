@@ -223,8 +223,18 @@ export default function RoomPage() {
     if (!socket || !player || !deviceId) return;
 
     socket.on('play-command', async ({ trackUri, position: pos, timestamp }: any) => {
-      console.log('Received play-command:', { trackUri, position: pos, deviceId });
-      const latency = Date.now() - timestamp;
+      const receiveTime = Date.now();
+      const latency = receiveTime - timestamp;
+      console.log('Received play-command:', {
+        trackUri,
+        position: pos,
+        deviceId,
+        latency: `${latency}ms`,
+        timestamp,
+        receiveTime
+      });
+
+      // Add latency compensation
       const adjustedPosition = pos + latency;
 
       try {
@@ -254,7 +264,7 @@ export default function RoomPage() {
           return;
         }
 
-        console.log('Successfully started playback');
+        console.log('Successfully started playback at position:', adjustedPosition, 'ms');
         // Start drift correction
         startSyncInterval();
       } catch (error) {
@@ -290,10 +300,12 @@ export default function RoomPage() {
       const myPosition = state.position;
       const drift = Math.abs(myPosition - hostPosition);
 
-      // Re-sync if drift is more than 100ms
-      if (drift > 100) {
-        console.log(`Drift detected: ${drift}ms, re-syncing...`);
+      // Re-sync if drift is more than 50ms (tightened from 100ms)
+      if (drift > 50) {
+        console.log(`Drift detected: ${drift}ms, re-syncing to ${hostPosition}ms...`);
         await player.seek(hostPosition);
+      } else if (drift > 0) {
+        console.log(`Small drift: ${drift}ms (within tolerance)`);
       }
     });
 
@@ -317,7 +329,7 @@ export default function RoomPage() {
       if (state && !state.paused && socket) {
         socket.emit('position-update', { roomCode, position: state.position });
       }
-    }, 2000);
+    }, 1000); // Reduced from 2000ms to 1000ms for tighter sync
   };
 
   const stopSyncInterval = () => {
