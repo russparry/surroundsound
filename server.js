@@ -80,7 +80,7 @@ app.prepare().then(() => {
     });
 
     // Host plays a track
-    socket.on('play-track', ({ roomCode, trackId, trackUri, position = 0 }) => {
+    socket.on('play-track', ({ roomCode, trackId, trackUri, position = 0, startTime }) => {
       const room = rooms.get(roomCode);
       if (room && room.host === socket.id) {
         room.currentTrack = { trackId, trackUri };
@@ -91,9 +91,10 @@ app.prepare().then(() => {
         io.to(roomCode).emit('play-command', {
           trackUri,
           position,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          startTime // Pass through the synchronized start time
         });
-        console.log(`Playing track in room ${roomCode}:`, trackUri);
+        console.log(`Playing track in room ${roomCode}:`, trackUri, startTime ? `(scheduled start: ${new Date(startTime).toISOString()})` : '');
       }
     });
 

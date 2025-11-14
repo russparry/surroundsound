@@ -222,7 +222,7 @@ export default function RoomPage() {
   useEffect(() => {
     if (!socket || !player || !deviceId) return;
 
-    socket.on('play-command', async ({ trackUri, position: pos, timestamp }: any) => {
+    socket.on('play-command', async ({ trackUri, position: pos, timestamp, startTime }: any) => {
       const receiveTime = Date.now();
       const latency = receiveTime - timestamp;
       console.log('Received play-command:', {
@@ -231,11 +231,22 @@ export default function RoomPage() {
         deviceId,
         latency: `${latency}ms`,
         timestamp,
-        receiveTime
+        receiveTime,
+        startTime
       });
 
-      // Add latency compensation
-      const adjustedPosition = pos + latency;
+      // If startTime is provided, wait until that moment to start
+      if (startTime) {
+        const waitTime = startTime - Date.now();
+        console.log(`Waiting ${waitTime}ms before starting playback (synchronized countdown)...`);
+
+        if (waitTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+
+      // No need for position adjustment since all devices start at the same time
+      const playPosition = pos;
 
       try {
         const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
@@ -246,7 +257,7 @@ export default function RoomPage() {
           },
           body: JSON.stringify({
             uris: [trackUri],
-            position_ms: adjustedPosition,
+            position_ms: playPosition,
           }),
         });
 
@@ -264,7 +275,7 @@ export default function RoomPage() {
           return;
         }
 
-        console.log('Successfully started playback at position:', adjustedPosition, 'ms');
+        console.log('✓ Successfully started synchronized playback at:', new Date().toISOString());
         // Start drift correction
         startSyncInterval();
       } catch (error) {
@@ -377,12 +388,22 @@ export default function RoomPage() {
       return;
     }
 
-    console.log('Emitting play-track event:', { roomCode, trackUri: track.uri });
+    // Schedule playback to start 2 seconds in the future for better sync
+    const startTime = Date.now() + 2000; // 2 second countdown
+
+    console.log('Emitting play-track event with delayed start:', {
+      roomCode,
+      trackUri: track.uri,
+      startTime,
+      delay: '2000ms'
+    });
+
     socket.emit('play-track', {
       roomCode,
       trackId: track.id,
       trackUri: track.uri,
       position: 0,
+      startTime, // All devices will start at this exact timestamp
     });
   };
 
