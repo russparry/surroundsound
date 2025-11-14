@@ -9,6 +9,7 @@ const SCOPES = [
   'user-read-private',
   'user-modify-playback-state',
   'user-read-playback-state',
+  'user-library-read',
 ].join(' ');
 
 export function generateCodeVerifier(length: number = 128): string {
