@@ -48,8 +48,16 @@ export async function getAccessToken(code: string): Promise<string> {
   const codeVerifier = localStorage.getItem('code_verifier');
 
   if (!codeVerifier) {
+    console.error('No code verifier found in localStorage');
     throw new Error('No code verifier found');
   }
+
+  console.log('Exchanging authorization code for token...', {
+    hasCode: !!code,
+    hasVerifier: !!codeVerifier,
+    clientId: CLIENT_ID ? 'set' : 'missing',
+    redirectUri: REDIRECT_URI,
+  });
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -66,10 +74,21 @@ export async function getAccessToken(code: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get access token');
+    const errorData = await response.text();
+    console.error('Token exchange failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorData,
+    });
+    throw new Error(`Failed to get access token: ${response.status} - ${errorData}`);
   }
 
   const data = await response.json();
+  console.log('Successfully got access token');
+
+  // Clean up code verifier after successful exchange
+  localStorage.removeItem('code_verifier');
+
   return data.access_token;
 }
 
