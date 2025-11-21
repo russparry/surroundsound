@@ -64,9 +64,11 @@ export default function RoomPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [currentPosition, setCurrentPosition] = useState(0);
+  const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
 
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
 
   // Update current playback position for display
   useEffect(() => {
@@ -308,9 +310,16 @@ export default function RoomPage() {
         console.log('✓ Successfully started synchronized playback at:', new Date().toISOString());
         // Start drift correction
         startSyncInterval();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error playing track:', error);
-        alert('Failed to play track. Check console for details.');
+
+        // Detect Safari autoplay restriction
+        if (error.name === 'NotAllowedError' || error.message?.includes('not allowed')) {
+          console.log('Autoplay blocked - requesting user interaction');
+          setNeedsUserInteraction(true);
+        } else {
+          alert('Failed to play track. Check console for details.');
+        }
       }
     });
 
@@ -340,11 +349,19 @@ export default function RoomPage() {
 
       const myPosition = state.position;
       const drift = Math.abs(myPosition - hostPosition);
+      const now = Date.now();
 
-      // Re-sync if drift is more than 50ms (tightened from 100ms)
-      if (drift > 50) {
+      // Debounce: Only re-sync if at least 500ms has passed since last sync
+      // This prevents stuttering from too-frequent corrections (especially on Android)
+      const timeSinceLastSync = now - lastSyncTimeRef.current;
+
+      // Re-sync if drift is more than 75ms (balanced for accuracy vs stuttering)
+      if (drift > 75 && timeSinceLastSync > 500) {
         console.log(`Drift detected: ${drift}ms, re-syncing to ${hostPosition}ms...`);
         await player.seek(hostPosition);
+        lastSyncTimeRef.current = now;
+      } else if (drift > 75) {
+        console.log(`Drift detected: ${drift}ms, but skipping (last sync was ${timeSinceLastSync}ms ago)`);
       } else if (drift > 0) {
         console.log(`Small drift: ${drift}ms (within tolerance)`);
       }
@@ -370,7 +387,7 @@ export default function RoomPage() {
       if (state && !state.paused && socket) {
         socket.emit('position-update', { roomCode, position: state.position });
       }
-    }, 1000); // Reduced from 2000ms to 1000ms for tighter sync
+    }, 1500); // Balanced at 1500ms to reduce stuttering on mobile devices
   };
 
   const stopSyncInterval = () => {
@@ -395,6 +412,22 @@ export default function RoomPage() {
 
     const data = await response.json();
     setSearchResults(data.tracks?.items || []);
+  };
+
+  // Enable audio (for Safari autoplay restrictions)
+  const handleEnableAudio = async () => {
+    if (!player) return;
+
+    try {
+      // Resume player to get user interaction permission
+      await player.resume();
+      await player.pause();
+
+      console.log('✓ User interaction granted, audio enabled');
+      setNeedsUserInteraction(false);
+    } catch (error) {
+      console.error('Failed to enable audio:', error);
+    }
   };
 
   // Play a track (host only)
@@ -487,6 +520,25 @@ export default function RoomPage() {
             <div className="text-center">
               <div className="text-9xl font-bold text-white mb-4">{countdown}</div>
               <div className="text-2xl text-white">Starting playback...</div>
+            </div>
+          </div>
+        )}
+
+        {/* Safari Autoplay Permission Overlay */}
+        {needsUserInteraction && (
+          <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+            <div className="text-center p-8 bg-gray-900 rounded-lg max-w-md">
+              <div className="text-6xl mb-6">🔊</div>
+              <h2 className="text-3xl font-bold text-white mb-4">Audio Permission Required</h2>
+              <p className="text-gray-300 mb-6">
+                Your browser requires user interaction before playing audio. Tap the button below to enable playback.
+              </p>
+              <button
+                onClick={handleEnableAudio}
+                className="px-8 py-4 bg-green-600 text-white text-xl font-bold rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
+              >
+                Tap to Enable Audio
+              </button>
             </div>
           </div>
         )}
