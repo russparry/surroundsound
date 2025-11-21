@@ -251,14 +251,17 @@ export default function RoomPage() {
     socket.on('play-command', async ({ trackUri, position: pos, timestamp, startTime }: any) => {
       const receiveTime = Date.now();
       const latency = receiveTime - timestamp;
-      console.log('Received play-command:', {
+      const waitTime = startTime ? (startTime - receiveTime) : 0;
+      console.log('📥 Received play-command:', {
         trackUri,
         position: pos,
         deviceId,
         latency: `${latency}ms`,
         timestamp,
         receiveTime,
-        startTime
+        startTime,
+        waitTime: `${waitTime}ms`,
+        isHost: isHost ? 'YES (HOST)' : 'NO (GUEST)'
       });
 
       // If startTime is provided, show countdown and wait until EXACT start time
@@ -285,6 +288,10 @@ export default function RoomPage() {
           setCountdown(null);
         }
       }
+
+      const actualStartTime = Date.now();
+      const timeDrift = startTime ? (actualStartTime - startTime) : 0;
+      console.log(`⏱️ Starting playback NOW. Expected: ${startTime}, Actual: ${actualStartTime}, Drift: ${timeDrift}ms`);
 
       // No need for position adjustment since all devices start at the same time
       const playPosition = pos;
