@@ -261,18 +261,27 @@ export default function RoomPage() {
         startTime
       });
 
-      // If startTime is provided, show countdown and wait
+      // If startTime is provided, show countdown and wait until EXACT start time
       if (startTime) {
         const waitTime = startTime - Date.now();
         console.log(`Waiting ${waitTime}ms before starting playback (synchronized countdown)...`);
 
         if (waitTime > 0) {
-          // Show countdown
-          const countdownSeconds = Math.ceil(waitTime / 1000);
-          for (let i = countdownSeconds; i > 0; i--) {
-            setCountdown(i);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+          // Update countdown display based on remaining time
+          const countdownInterval = setInterval(() => {
+            const remaining = startTime - Date.now();
+            const secondsLeft = Math.ceil(remaining / 1000);
+            if (secondsLeft > 0) {
+              setCountdown(secondsLeft);
+            } else {
+              setCountdown(null);
+              clearInterval(countdownInterval);
+            }
+          }, 100); // Update every 100ms for smooth countdown
+
+          // Wait until the EXACT startTime (not a fixed duration)
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          clearInterval(countdownInterval);
           setCountdown(null);
         }
       }
