@@ -9,6 +9,7 @@ import { redirectToSpotifyAuthorize } from '@/lib/spotify';
 export default function Home() {
   const { isAuthenticated, logout } = useSpotify();
   const [roomCode, setRoomCode] = useState('');
+  const [showJoinInput, setShowJoinInput] = useState(false);
   const router = useRouter();
 
   const handleCreateRoom = () => {
@@ -28,90 +29,152 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-8">
-        <h1 className="text-5xl font-bold mb-4">SyncSound</h1>
-        <p className="text-xl mb-8 text-gray-600 text-center max-w-2xl">
-          Create a surround sound experience with your friends
-        </p>
+      <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600">
+        {/* Music Note Icon */}
+        <div className="mb-8">
+          <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-          <h2 className="text-2xl font-semibold mb-4 text-center">Get Started</h2>
+        {/* Title */}
+        <h1 className="text-6xl font-bold text-white mb-4">Surreal Sound</h1>
+        <p className="text-xl text-white/90 mb-12">Listen together, anywhere</p>
 
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6">
-            <p className="font-semibold mb-2">Requirements:</p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Spotify Premium account</li>
-              <li>Each person needs their own account</li>
-              <li>Works on any device with a browser</li>
-            </ul>
+        {/* Glassmorphism Card */}
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+          <div className="space-y-6">
+            {/* Name Input - Optional, keeping for future use */}
+            <div>
+              <label className="block text-white/80 text-sm mb-2">Enter your name</label>
+              <input
+                type="text"
+                placeholder="Your name"
+                className="w-full px-6 py-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition"
+              />
+            </div>
+
+            {/* Connect with Spotify Button */}
+            <button
+              onClick={handleLogin}
+              className="w-full px-6 py-4 bg-pink-300/80 hover:bg-pink-300 text-white rounded-2xl transition font-semibold text-lg shadow-lg"
+            >
+              Connect with Spotify
+            </button>
+
+            {/* Footer Text */}
+            <p className="text-center text-white/70 text-sm">
+              Spotify Premium required - Mock demo mode
+            </p>
           </div>
-
-          <button
-            onClick={handleLogin}
-            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center gap-2"
-          >
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-            </svg>
-            Login with Spotify
-          </button>
-
-          <p className="mt-4 text-sm text-gray-500 text-center">
-            You'll be redirected to Spotify to authorize
-          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600 relative">
+      {/* Logout button - hidden in top right */}
       <div className="absolute top-4 right-4">
         <button
           onClick={logout}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          className="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg hover:bg-white/20 transition text-sm"
         >
           Logout
         </button>
       </div>
 
-      <h1 className="text-5xl font-bold mb-8">SyncSound</h1>
+      {/* Music Note Icon */}
+      <div className="mb-6">
+        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+      </div>
 
-      <div className="flex flex-col gap-8 w-full max-w-md">
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4">Create Room</h2>
-          <p className="text-gray-600 mb-4">
-            Start a new listening session and invite your friends
-          </p>
-          <button
-            onClick={handleCreateRoom}
-            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-          >
-            Create Room
-          </button>
-        </div>
+      {/* Welcome Message */}
+      <h1 className="text-5xl font-bold text-white mb-2">Welcome, Dude Person</h1>
+      <p className="text-xl text-white/90 mb-12">Ready to share the vibe?</p>
 
-        <div className="bg-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4">Join Room</h2>
-          <p className="text-gray-600 mb-4">
-            Enter the room code from your friend
-          </p>
-          <input
-            type="text"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            placeholder="Enter room code"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
-            maxLength={6}
-          />
+      {/* Action Cards */}
+      <div className="flex flex-col gap-6 w-full max-w-2xl">
+        {/* Create Room Card */}
+        <button
+          onClick={handleCreateRoom}
+          className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 hover:bg-white/15 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-[1.02]"
+        >
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-pink-400/30 rounded-2xl flex items-center justify-center group-hover:bg-pink-400/40 transition">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <h2 className="text-3xl font-bold text-white mb-1">Create Room</h2>
+              <p className="text-white/70">Host a listening session</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Join Room Card */}
+        {!showJoinInput ? (
           <button
-            onClick={handleJoinRoom}
-            disabled={!roomCode.trim()}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+            onClick={() => setShowJoinInput(true)}
+            className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 hover:bg-white/15 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-[1.02]"
           >
-            Join Room
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-blue-400/30 rounded-2xl flex items-center justify-center group-hover:bg-blue-400/40 transition">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h2 className="text-3xl font-bold text-white mb-1">Join Room</h2>
+                <p className="text-white/70">Enter a room code</p>
+              </div>
+            </div>
           </button>
-        </div>
+        ) : (
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 shadow-xl">
+            <div className="flex items-center gap-6 mb-4">
+              <div className="w-16 h-16 bg-blue-400/30 rounded-2xl flex items-center justify-center">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h2 className="text-3xl font-bold text-white mb-1">Join Room</h2>
+                <p className="text-white/70">Enter a room code</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                placeholder="Room code"
+                className="flex-1 px-6 py-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition uppercase"
+                maxLength={6}
+                autoFocus
+              />
+              <button
+                onClick={handleJoinRoom}
+                disabled={!roomCode.trim()}
+                className="px-8 py-4 bg-blue-400/80 hover:bg-blue-400 text-white rounded-2xl transition font-semibold disabled:bg-white/20 disabled:cursor-not-allowed"
+              >
+                Join
+              </button>
+              <button
+                onClick={() => {
+                  setShowJoinInput(false);
+                  setRoomCode('');
+                }}
+                className="px-4 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

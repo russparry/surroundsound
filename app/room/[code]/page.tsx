@@ -507,41 +507,61 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold">Room: {roomCode}</h1>
-            <p className="text-gray-600 mt-2">
-              {isHost ? 'You are the host' : 'Listening mode'} | {memberCount} member(s)
-            </p>
-            {!isReady && (
-              <p className="text-yellow-600 mt-2">
-                Connecting to Spotify... (Make sure you have Spotify Premium and check browser console for errors)
-              </p>
-            )}
-            {isReady && <p className="text-green-600 mt-2">✓ Connected to Spotify</p>}
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            {/* Member Count */}
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span className="text-white font-semibold">{memberCount}</span>
+            </div>
+
+            {/* Room Code */}
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-5 py-2 rounded-xl">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-white font-bold text-lg tracking-wider">{roomCode}</span>
+            </div>
           </div>
+
+          {/* Leave Button */}
           <button
             onClick={() => router.push('/')}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            className="flex items-center gap-2 px-6 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
           >
-            Leave Room
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Leave
           </button>
         </div>
 
+        {/* Connection Status - Subtle indicator */}
+        {!isReady && (
+          <div className="mb-4 bg-yellow-500/20 backdrop-blur-md border border-yellow-500/30 rounded-xl px-4 py-3 text-center">
+            <p className="text-white/90 text-sm">
+              Connecting to Spotify...
+            </p>
+          </div>
+        )}
+
         {/* Safari Autoplay Permission Overlay */}
         {needsUserInteraction && (
-          <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-            <div className="text-center p-8 bg-gray-900 rounded-lg max-w-md">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="text-center p-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl max-w-md shadow-2xl">
               <div className="text-6xl mb-6">🔊</div>
               <h2 className="text-3xl font-bold text-white mb-4">Audio Permission Required</h2>
-              <p className="text-gray-300 mb-6">
+              <p className="text-white/80 mb-6">
                 Your browser requires user interaction before playing audio. Tap the button below to enable playback.
               </p>
               <button
                 onClick={handleEnableAudio}
-                className="px-8 py-4 bg-green-600 text-white text-xl font-bold rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
+                className="px-8 py-4 bg-pink-500/80 hover:bg-pink-500 text-white text-xl font-bold rounded-2xl transition-colors shadow-lg"
               >
                 Tap to Enable Audio
               </button>
@@ -551,21 +571,21 @@ export default function RoomPage() {
 
         {/* Playback Position Display */}
         {currentTrack && (
-          <div className="bg-gray-900 text-white p-4 rounded-lg mb-4 font-mono">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-6 font-mono">
             <div className="flex items-center justify-between">
               <div className="flex-1 text-center">
-                <div className="text-sm text-gray-400 mb-1">Playback Position</div>
-                <div className="text-3xl font-bold">
+                <div className="text-sm text-white/60 mb-2">Playback Position</div>
+                <div className="text-4xl font-bold text-white">
                   {Math.floor(currentPosition / 1000)}.{String(currentPosition % 1000).padStart(3, '0')}s
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-white/50 mt-2">
                   ({currentPosition}ms)
                 </div>
               </div>
               {countdown !== null && (
-                <div className="flex-shrink-0 ml-6 text-center border-l border-gray-700 pl-6">
-                  <div className="text-sm text-gray-400 mb-1">Starting in</div>
-                  <div className="text-6xl font-bold text-green-400">{countdown}</div>
+                <div className="flex-shrink-0 ml-6 text-center border-l border-white/20 pl-6">
+                  <div className="text-sm text-white/60 mb-2">Starting in</div>
+                  <div className="text-6xl font-bold text-pink-300">{countdown}</div>
                 </div>
               )}
             </div>
@@ -574,32 +594,46 @@ export default function RoomPage() {
 
         {/* Current Track */}
         {currentTrack && (
-          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900">Now Playing</h2>
-            <div className="flex items-center gap-4">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-6 shadow-xl">
+            <h2 className="text-2xl font-semibold mb-4 text-white">Now Playing</h2>
+            <div className="flex items-center gap-6">
               {currentTrack.album?.images?.[0] && (
                 <img
                   src={currentTrack.album.images[0].url}
                   alt={currentTrack.name}
-                  className="w-24 h-24 rounded"
+                  className="w-28 h-28 rounded-xl shadow-lg"
                 />
               )}
-              <div>
-                <p className="text-xl font-bold text-gray-900">{currentTrack.name}</p>
-                <p className="text-gray-600">
+              <div className="flex-1">
+                <p className="text-2xl font-bold text-white mb-1">{currentTrack.name}</p>
+                <p className="text-white/70 text-lg">
                   {currentTrack.artists?.map((a: any) => a.name).join(', ')}
                 </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {isPlaying ? '▶️ Playing' : '⏸️ Paused'}
+                <p className="text-sm text-white/60 mt-3 flex items-center gap-2">
+                  {isPlaying ? (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                      Playing
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                      </svg>
+                      Paused
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
             {isHost && (
-              <div className="mt-4 flex gap-4">
+              <div className="mt-6 flex gap-3">
                 <button
                   onClick={isPlaying ? handlePause : handleResume}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-6 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold"
                 >
                   {isPlaying ? 'Pause' : 'Resume'}
                 </button>
@@ -610,9 +644,9 @@ export default function RoomPage() {
 
         {/* Debug Info */}
         {isHost && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
-            <p className="text-sm text-gray-700">
-              <strong>Debug Info:</strong> Socket: {isConnected ? '✓' : '✗'} |
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4 mb-6">
+            <p className="text-sm text-white/80">
+              <strong>Debug:</strong> Socket: {isConnected ? '✓' : '✗'} |
               Device: {deviceId ? '✓' : '✗'} |
               Player: {player ? '✓' : '✗'} |
               Ready: {isReady ? '✓' : '✗'}
@@ -622,61 +656,69 @@ export default function RoomPage() {
 
         {/* Search (host only) */}
         {isHost && (
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900">Search & Play</h2>
-            <div className="flex gap-2 mb-4">
+          <div>
+            {/* Search Bar */}
+            <div className="mb-6">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search for a song..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+                placeholder="Search for songs..."
+                className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition text-lg"
               />
-              <button
-                onClick={handleSearch}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Search
-              </button>
             </div>
 
-            {searchResults.length > 0 && (
-              <div className="space-y-2">
+            {/* Search Results */}
+            {searchResults.length > 0 ? (
+              <div className="space-y-3">
                 {searchResults.map((track) => (
                   <div
                     key={track.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition-all cursor-pointer shadow-lg hover:shadow-xl"
                     onClick={() => handlePlayTrack(track)}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       {track.album?.images?.[2] && (
                         <img
                           src={track.album.images[2].url}
                           alt={track.name}
-                          className="w-12 h-12 rounded"
+                          className="w-16 h-16 rounded-xl shadow-md"
                         />
                       )}
-                      <div>
-                        <p className="font-semibold text-gray-900">{track.name}</p>
-                        <p className="text-sm text-gray-600">
+                      <div className="flex-1">
+                        <p className="font-bold text-white text-lg">{track.name}</p>
+                        <p className="text-sm text-white/70">
                           {track.artists.map((a: any) => a.name).join(', ')}
                         </p>
                       </div>
+                      <button className="px-6 py-3 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold opacity-0 group-hover:opacity-100">
+                        Play
+                      </button>
                     </div>
-                    <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                      Play
-                    </button>
                   </div>
                 ))}
+              </div>
+            ) : (
+              /* Empty State - matches model2.png */
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-16 flex flex-col items-center justify-center min-h-[400px]">
+                <svg className="w-24 h-24 text-white/40 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <p className="text-white/60 text-xl">Search for a song to start the session</p>
               </div>
             )}
           </div>
         )}
 
         {!isHost && !currentTrack && (
-          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-            <p className="text-gray-600">Waiting for host to play a track...</p>
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-16 text-center">
+            <div className="flex flex-col items-center">
+              <svg className="w-20 h-20 text-white/40 mb-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+              <p className="text-white/70 text-xl">Waiting for host to play a track...</p>
+            </div>
           </div>
         )}
       </div>
