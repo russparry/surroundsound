@@ -514,16 +514,6 @@ export default function RoomPage() {
           </button>
         </div>
 
-        {/* Countdown Overlay */}
-        {countdown !== null && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="text-center">
-              <div className="text-9xl font-bold text-white mb-4">{countdown}</div>
-              <div className="text-2xl text-white">Starting playback...</div>
-            </div>
-          </div>
-        )}
-
         {/* Safari Autoplay Permission Overlay */}
         {needsUserInteraction && (
           <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
@@ -545,13 +535,23 @@ export default function RoomPage() {
 
         {/* Playback Position Display */}
         {currentTrack && (
-          <div className="bg-gray-900 text-white p-4 rounded-lg mb-4 font-mono text-center">
-            <div className="text-sm text-gray-400 mb-1">Playback Position</div>
-            <div className="text-3xl font-bold">
-              {Math.floor(currentPosition / 1000)}.{String(currentPosition % 1000).padStart(3, '0')}s
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              ({currentPosition}ms)
+          <div className="bg-gray-900 text-white p-4 rounded-lg mb-4 font-mono">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 text-center">
+                <div className="text-sm text-gray-400 mb-1">Playback Position</div>
+                <div className="text-3xl font-bold">
+                  {Math.floor(currentPosition / 1000)}.{String(currentPosition % 1000).padStart(3, '0')}s
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  ({currentPosition}ms)
+                </div>
+              </div>
+              {countdown !== null && (
+                <div className="flex-shrink-0 ml-6 text-center border-l border-gray-700 pl-6">
+                  <div className="text-sm text-gray-400 mb-1">Starting in</div>
+                  <div className="text-6xl font-bold text-green-400">{countdown}</div>
+                </div>
+              )}
             </div>
           </div>
         )}
