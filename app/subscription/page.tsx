@@ -3,10 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { loadStripe } from '@stripe/stripe-js';
 import { STRIPE_CONFIG } from '@/lib/stripe';
-
-const stripePromise = loadStripe(STRIPE_CONFIG.PUBLISHABLE_KEY);
 
 export default function SubscriptionPage() {
   const router = useRouter();
@@ -60,18 +57,11 @@ export default function SubscriptionPage() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      // Redirect to Stripe Checkout
-      const stripe = await stripePromise;
-      if (!stripe) {
-        throw new Error('Failed to load Stripe');
-      }
-
-      const { error: stripeError } = await stripe.redirectToCheckout({
-        sessionId: data.sessionId,
-      });
-
-      if (stripeError) {
-        throw new Error(stripeError.message);
+      // Redirect to Stripe Checkout using the URL
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
