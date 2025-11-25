@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: syncsound
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PRICE_ID
+        sync: false
+      - key: NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+        sync: false
+      - key: NEXT_PUBLIC_REDIRECT_URI
+        value: https://yourapp.onrender.com/auth
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://yourapp.onrender.com
+    autoDeploy: true

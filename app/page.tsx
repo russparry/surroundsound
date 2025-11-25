@@ -1,16 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSpotify } from '@/contexts/SpotifyContext';
 import { nanoid } from 'nanoid';
 import { useRouter } from 'next/navigation';
 import { redirectToSpotifyAuthorize } from '@/lib/spotify';
 
 export default function Home() {
-  const { isAuthenticated, logout } = useSpotify();
+  const { user, userProfile, loading: authLoading, signOut } = useAuth();
+  const { accessToken, setAccessToken } = useSpotify();
   const [roomCode, setRoomCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Redirect to login if not authenticated with Supabase
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
 
   const handleCreateRoom = () => {
     const code = nanoid(6).toUpperCase();
@@ -27,9 +36,40 @@ export default function Home() {
     redirectToSpotifyAuthorize();
   };
 
-  if (!isAuthenticated) {
+  const handleLogout = async () => {
+    await signOut();
+    setAccessToken(null);
+    router.push('/login');
+  };
+
+  // Show loading state
+  if (authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600">
+        <div className="text-white text-2xl">Loading...</div>
+      </main>
+    );
+  }
+
+  // If not logged in, redirect will happen via useEffect
+  if (!user || !userProfile) {
+    return null;
+  }
+
+  // Check if user has connected Spotify
+  if (!accessToken) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-pink-500 via-purple-500 to-blue-600">
+        {/* Logout button */}
+        <div className="absolute top-4 right-4">
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg hover:bg-white/20 transition text-sm"
+          >
+            Logout
+          </button>
+        </div>
+
         {/* Music Note Icon */}
         <div className="mb-8">
           <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -38,33 +78,24 @@ export default function Home() {
         </div>
 
         {/* Title */}
-        <h1 className="text-6xl font-bold text-white mb-4">Surreal Sound</h1>
-        <p className="text-xl text-white/90 mb-12">Listen together, anywhere</p>
+        <h1 className="text-6xl font-bold text-white mb-4">SyncSound</h1>
+        <p className="text-xl text-white/90 mb-4">Welcome, {userProfile.full_name}!</p>
+        <p className="text-lg text-white/80 mb-12">Connect your Spotify to continue</p>
 
         {/* Glassmorphism Card */}
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 max-w-md w-full shadow-2xl">
           <div className="space-y-6">
-            {/* Name Input - Optional, keeping for future use */}
-            <div>
-              <label className="block text-white/80 text-sm mb-2">Enter your name</label>
-              <input
-                type="text"
-                placeholder="Your name"
-                className="w-full px-6 py-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition"
-              />
-            </div>
-
             {/* Connect with Spotify Button */}
             <button
               onClick={handleLogin}
-              className="w-full px-6 py-4 bg-pink-300/80 hover:bg-pink-300 text-white rounded-2xl transition font-semibold text-lg shadow-lg"
+              className="w-full px-6 py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl transition font-semibold text-lg shadow-lg"
             >
               Connect with Spotify
             </button>
 
             {/* Footer Text */}
             <p className="text-center text-white/70 text-sm">
-              Spotify Premium required - Mock demo mode
+              Spotify Premium required
             </p>
           </div>
         </div>
@@ -77,7 +108,7 @@ export default function Home() {
       {/* Logout button - hidden in top right */}
       <div className="absolute top-4 right-4">
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-lg hover:bg-white/20 transition text-sm"
         >
           Logout
@@ -92,7 +123,7 @@ export default function Home() {
       </div>
 
       {/* Welcome Message */}
-      <h1 className="text-5xl font-bold text-white mb-2">Welcome, Dude Person</h1>
+      <h1 className="text-5xl font-bold text-white mb-2">Welcome, {userProfile.full_name}!</h1>
       <p className="text-xl text-white/90 mb-12">Ready to share the vibe?</p>
 
       {/* Action Cards */}

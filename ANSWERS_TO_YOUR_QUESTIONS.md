@@ -43,6 +43,7 @@ If it still doesn't work:
    - Connect to same WiFi
    - Instead of localhost, use: `http://192.168.1.100:3000`
    - Replace `192.168.1.100` with YOUR actual IP
+   `http://172.217.160.142:3000`
 
 **Example:**
 - Your Computer (Host): `http://localhost:3000` or `http://192.168.1.100:3000`
