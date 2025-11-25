@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { signIn, user } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -26,11 +25,14 @@ export default function LoginPage() {
       router.push('/subscription');
     }
 
-    // Show success message if just registered
-    if (searchParams.get('registered') === 'true') {
-      setSuccessMessage('Account created successfully! Please sign in.');
+    // Show success message if just registered (check client-side only)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('registered') === 'true') {
+        setSuccessMessage('Account created successfully! Please sign in.');
+      }
     }
-  }, [user, searchParams, router]);
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

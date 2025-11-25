@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { STRIPE_CONFIG } from '@/lib/stripe';
 
@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic';
 
 export default function SubscriptionPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, userProfile, loading: authLoading, refreshUserProfile } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -22,17 +21,22 @@ export default function SubscriptionPage() {
       router.push('/login');
     }
 
-    // Show success message if payment was successful
-    if (searchParams.get('success') === 'true') {
-      setSuccessMessage('Payment successful! Your subscription is now active.');
-      refreshUserProfile();
-    }
+    // Check URL params client-side only
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
 
-    // Show error if payment was canceled
-    if (searchParams.get('canceled') === 'true') {
-      setError('Payment was canceled. Please try again.');
+      // Show success message if payment was successful
+      if (params.get('success') === 'true') {
+        setSuccessMessage('Payment successful! Your subscription is now active.');
+        refreshUserProfile();
+      }
+
+      // Show error if payment was canceled
+      if (params.get('canceled') === 'true') {
+        setError('Payment was canceled. Please try again.');
+      }
     }
-  }, [user, authLoading, searchParams, router, refreshUserProfile]);
+  }, [user, authLoading, router, refreshUserProfile]);
 
   const handleSubscribe = async () => {
     if (!user || !userProfile) return;
