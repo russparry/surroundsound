@@ -20,9 +20,9 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    // If already logged in, redirect to subscription page
+    // If already logged in, redirect to home page
     if (user) {
-      router.push('/subscription');
+      router.push('/');
     }
 
     // Show success message if just registered (check client-side only)
@@ -55,8 +55,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to subscription page
-      router.push('/subscription');
+      // Redirect to home page
+      router.push('/');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setLoading(false);

@@ -27,8 +27,13 @@ export default function SubscriptionPage() {
 
       // Show success message if payment was successful
       if (params.get('success') === 'true') {
-        setSuccessMessage('Payment successful! Your subscription is now active.');
+        setSuccessMessage('Payment successful! Your subscription is now active. Redirecting...');
         refreshUserProfile();
+
+        // Auto-redirect to home after 2 seconds
+        setTimeout(() => {
+          router.push('/');
+        }, 2000);
       }
 
       // Show error if payment was canceled
