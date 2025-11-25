@@ -9,7 +9,7 @@ import { redirectToSpotifyAuthorize } from '@/lib/spotify';
 
 export default function Home() {
   const { user, userProfile, loading: authLoading, signOut } = useAuth();
-  const { accessToken, setAccessToken } = useSpotify();
+  const { accessToken, logout: logoutSpotify } = useSpotify();
   const [roomCode, setRoomCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function Home() {
 
   const handleLogout = async () => {
     await signOut();
-    setAccessToken(null);
+    logoutSpotify();
     router.push('/login');
   };
 
