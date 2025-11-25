@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { STRIPE_CONFIG } from '@/lib/stripe';
 
+export const dynamic = 'force-dynamic';
+
 export default function SubscriptionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
