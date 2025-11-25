@@ -11,7 +11,10 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(npm run build:*)",
-      "WebFetch(domain:developer.spotify.com)"
+      "WebFetch(domain:developer.spotify.com)",
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "WebFetch(domain:render.com)"
     ],
     "deny": [],
     "ask": []
