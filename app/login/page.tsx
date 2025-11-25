@@ -20,9 +20,9 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    // If already logged in, redirect to home page
+    // If already logged in, redirect to subscription page
     if (user) {
-      router.push('/');
+      router.push('/subscription');
     }
 
     // Show success message if just registered (check client-side only)
@@ -55,8 +55,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to home page
-      router.push('/');
+      // Redirect to subscription page for authenticated users
+      router.push('/subscription');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setLoading(false);
@@ -125,7 +125,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-4">
           <p className="text-gray-600">
             Don't have an account?{' '}
             <button
@@ -135,6 +135,26 @@ export default function LoginPage() {
               Create Account
             </button>
           </p>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              // Set guest mode flag
+              localStorage.setItem('guest_mode', 'true');
+              router.push('/');
+            }}
+            className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+          >
+            Continue without SyncSound account
+          </button>
         </div>
       </div>
     </div>

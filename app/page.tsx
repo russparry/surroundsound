@@ -12,12 +12,19 @@ export default function Home() {
   const { accessToken, logout: logoutSpotify } = useSpotify();
   const [roomCode, setRoomCode] = useState('');
   const [showJoinInput, setShowJoinInput] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login if not authenticated with Supabase
-    if (!authLoading && !user) {
-      router.push('/login');
+    // Check if in guest mode
+    if (typeof window !== 'undefined') {
+      const guestMode = localStorage.getItem('guest_mode') === 'true';
+      setIsGuestMode(guestMode);
+
+      // Only redirect to login if not authenticated AND not in guest mode
+      if (!authLoading && !user && !guestMode) {
+        router.push('/login');
+      }
     }
   }, [user, authLoading, router]);
 
@@ -37,13 +44,21 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
-    await signOut();
-    logoutSpotify();
-    router.push('/login');
+    if (isGuestMode) {
+      // Clear guest mode and Spotify token
+      localStorage.removeItem('guest_mode');
+      logoutSpotify();
+      router.push('/login');
+    } else {
+      // Normal logout
+      await signOut();
+      logoutSpotify();
+      router.push('/login');
+    }
   };
 
-  // Show loading state
-  if (authLoading) {
+  // Show loading state (only if not in guest mode)
+  if (authLoading && !isGuestMode) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600">
         <div className="text-white text-2xl">Loading...</div>
@@ -51,10 +66,13 @@ export default function Home() {
     );
   }
 
-  // If not logged in, redirect will happen via useEffect
-  if (!user || !userProfile) {
+  // If not logged in and not guest mode, redirect will happen via useEffect
+  if (!user && !isGuestMode) {
     return null;
   }
+
+  // Get display name (user's name or "Guest")
+  const displayName = userProfile?.full_name || 'Guest';
 
   // Check if user has connected Spotify
   if (!accessToken) {
@@ -79,7 +97,7 @@ export default function Home() {
 
         {/* Title */}
         <h1 className="text-6xl font-bold text-white mb-4">SyncSound</h1>
-        <p className="text-xl text-white/90 mb-4">Welcome, {userProfile.full_name}!</p>
+        <p className="text-xl text-white/90 mb-4">Welcome, {displayName}!</p>
         <p className="text-lg text-white/80 mb-12">Connect your Spotify to continue</p>
 
         {/* Glassmorphism Card */}
@@ -123,7 +141,7 @@ export default function Home() {
       </div>
 
       {/* Welcome Message */}
-      <h1 className="text-5xl font-bold text-white mb-2">Welcome, {userProfile.full_name}!</h1>
+      <h1 className="text-5xl font-bold text-white mb-2">Welcome, {displayName}!</h1>
       <p className="text-xl text-white/90 mb-12">Ready to share the vibe?</p>
 
       {/* Action Cards */}
