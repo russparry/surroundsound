@@ -70,6 +70,17 @@ export default function RoomPage() {
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
 
+  // Detect iOS device on mount
+  useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (isIOS) {
+      console.log('iOS device detected - will require user interaction for audio');
+      // Don't set needsUserInteraction here - wait until playback starts
+    }
+  }, []);
+
   // Update current playback position for display
   useEffect(() => {
     if (!player) return;
@@ -326,10 +337,24 @@ export default function RoomPage() {
         console.log('✓ Successfully started synchronized playback at:', new Date().toISOString());
         // Start drift correction
         startSyncInterval();
+
+        // iOS workaround: Check if audio is actually playing after a short delay
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        if (isIOS) {
+          setTimeout(async () => {
+            const state = await player.getCurrentState();
+            if (state && state.paused) {
+              console.log('iOS detected audio not playing - requesting user interaction');
+              setNeedsUserInteraction(true);
+            }
+          }, 500);
+        }
       } catch (error: any) {
         console.error('Error playing track:', error);
 
-        // Detect Safari autoplay restriction
+        // Detect Safari/iOS autoplay restriction
         if (error.name === 'NotAllowedError' || error.message?.includes('not allowed')) {
           console.log('Autoplay blocked - requesting user interaction');
           setNeedsUserInteraction(true);
@@ -550,21 +575,27 @@ export default function RoomPage() {
           </div>
         )}
 
-        {/* Safari Autoplay Permission Overlay */}
+        {/* Safari/iOS Autoplay Permission Overlay */}
         {needsUserInteraction && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="text-center p-8 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl max-w-md shadow-2xl">
               <div className="text-6xl mb-6">🔊</div>
               <h2 className="text-3xl font-bold text-white mb-4">Audio Permission Required</h2>
               <p className="text-white/80 mb-6">
-                Your browser requires user interaction before playing audio. Tap the button below to enable playback.
+                {/iPad|iPhone|iPod/.test(navigator.userAgent) ?
+                  'iOS requires a tap to enable audio. This is normal - just tap the button below and music will start playing!' :
+                  'Your browser requires user interaction before playing audio. Tap the button below to enable playback.'
+                }
               </p>
               <button
                 onClick={handleEnableAudio}
-                className="px-8 py-4 bg-pink-500/80 hover:bg-pink-500 text-white text-xl font-bold rounded-2xl transition-colors shadow-lg"
+                className="px-8 py-4 bg-pink-500/80 hover:bg-pink-500 text-white text-xl font-bold rounded-2xl transition-colors shadow-lg animate-pulse"
               >
-                Tap to Enable Audio
+                🎵 Tap to Enable Audio
               </button>
+              <p className="text-white/50 text-sm mt-4">
+                (You only need to do this once per session)
+              </p>
             </div>
           </div>
         )}
