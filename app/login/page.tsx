@@ -20,19 +20,32 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    // If already logged in, redirect to subscription page
-    if (user) {
-      router.push('/subscription');
-    }
-
     // Show success message if just registered (check client-side only)
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('registered') === 'true') {
-        setSuccessMessage('Account created successfully! Please sign in.');
+        setSuccessMessage('Account created successfully! Redirecting...');
       }
     }
+
+    // If already logged in, redirect to subscription page
+    if (user) {
+      router.push('/subscription');
+    }
   }, [user, router]);
+
+  // Show loading screen while redirecting if user is already logged in
+  if (user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-12 text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Account Created!</h2>
+          <p className="text-gray-600">Redirecting to subscription...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
