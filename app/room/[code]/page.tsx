@@ -65,30 +65,51 @@ export default function RoomPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
+  const [showIOSWarning, setShowIOSWarning] = useState(false);
 
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
 
-  // Detect iOS device on mount
+  // Detect iOS device on mount and show warning
   useEffect(() => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (isIOS) {
-      console.log('iOS device detected - will require user interaction for audio');
-      // Don't set needsUserInteraction here - wait until playback starts
+      console.log('⚠️ iOS device detected - Spotify Web Playback SDK has limited support');
+      console.log('🔧 Recommendation: Use Safari instead of Chrome, or use desktop/Android');
+      setShowIOSWarning(true);
     }
   }, []);
 
   // Update current playback position for display
   useEffect(() => {
-    if (!player) return;
+    if (!player) {
+      console.log('⚠️ No player available for position updates');
+      return;
+    }
+
+    console.log('✓ Starting position update interval (every 100ms)');
 
     const updatePosition = async () => {
-      const state = await player.getCurrentState();
-      if (state) {
-        setCurrentPosition(state.position);
+      try {
+        const state = await player.getCurrentState();
+        if (state) {
+          setCurrentPosition(state.position);
+          // Log player state every 5 seconds for debugging
+          if (Math.floor(state.position / 5000) !== Math.floor(currentPosition / 5000)) {
+            console.log('Player state:', {
+              position: state.position,
+              paused: state.paused,
+              track: state.track_window?.current_track?.name,
+            });
+          }
+        } else {
+          console.warn('⚠️ getCurrentState returned null - player not initialized');
+        }
+      } catch (error) {
+        console.error('Error getting player state:', error);
       }
     };
 
@@ -96,6 +117,7 @@ export default function RoomPage() {
     positionIntervalRef.current = setInterval(updatePosition, 100);
 
     return () => {
+      console.log('Cleaning up position update interval');
       if (positionIntervalRef.current) {
         clearInterval(positionIntervalRef.current);
       }
@@ -582,6 +604,24 @@ export default function RoomPage() {
               <p className="text-white/50 text-sm mt-4">
                 (You only need to do this once per session)
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* iOS Compatibility Warning */}
+        {showIOSWarning && (
+          <div className="bg-yellow-500/20 backdrop-blur-md border border-yellow-500/40 rounded-2xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="text-white font-bold mb-1">iPhone/iPad Notice</h3>
+                <p className="text-white/90 text-sm mb-2">
+                  Spotify's Web Player has limited support on iOS devices. Audio may not play properly.
+                </p>
+                <p className="text-white/70 text-xs">
+                  <strong>Best experience:</strong> Use Safari (not Chrome), or switch to Android/Desktop
+                </p>
+              </div>
             </div>
           </div>
         )}
