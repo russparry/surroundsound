@@ -337,20 +337,6 @@ export default function RoomPage() {
         console.log('✓ Successfully started synchronized playback at:', new Date().toISOString());
         // Start drift correction
         startSyncInterval();
-
-        // iOS workaround: Check if audio is actually playing after a short delay
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-        if (isIOS) {
-          setTimeout(async () => {
-            const state = await player.getCurrentState();
-            if (state && state.paused) {
-              console.log('iOS detected audio not playing - requesting user interaction');
-              setNeedsUserInteraction(true);
-            }
-          }, 500);
-        }
       } catch (error: any) {
         console.error('Error playing track:', error);
 
