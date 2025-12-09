@@ -36,15 +36,17 @@ app.prepare().then(() => {
     console.log('Client connected:', socket.id);
 
     // Create a new room
-    socket.on('create-room', ({ roomCode, userId }) => {
+    socket.on('create-room', ({ roomCode, userId, displayName }) => {
       if (!rooms.has(roomCode)) {
         rooms.set(roomCode, {
           host: socket.id,
           hostUserId: userId,
-          members: [{ socketId: socket.id, userId }],
+          members: [{ socketId: socket.id, userId, displayName: displayName || 'Host' }],
           currentTrack: null,
           isPlaying: false,
           position: 0,
+          queue: [], // Queue of upcoming tracks
+          currentQueueIndex: -1, // -1 means no track from queue is playing
         });
         socket.join(roomCode);
         socket.emit('room-created', { roomCode, isHost: true });
@@ -55,23 +57,27 @@ app.prepare().then(() => {
     });
 
     // Join an existing room
-    socket.on('join-room', ({ roomCode, userId }) => {
+    socket.on('join-room', ({ roomCode, userId, displayName }) => {
       const room = rooms.get(roomCode);
       if (room) {
-        room.members.push({ socketId: socket.id, userId });
+        room.members.push({ socketId: socket.id, userId, displayName: displayName || 'Guest' });
         socket.join(roomCode);
         socket.emit('room-joined', {
           roomCode,
           isHost: false,
           currentTrack: room.currentTrack,
           isPlaying: room.isPlaying,
-          position: room.position
+          position: room.position,
+          queue: room.queue,
+          members: room.members
         });
 
         // Notify all members about the new user
         io.to(roomCode).emit('member-joined', {
           userId,
-          memberCount: room.members.length
+          displayName: displayName || 'Guest',
+          memberCount: room.members.length,
+          members: room.members
         });
         console.log(`User joined room: ${roomCode}`);
       } else {
@@ -163,7 +169,8 @@ app.prepare().then(() => {
           } else {
             // Notify remaining members
             io.to(roomCode).emit('member-left', {
-              memberCount: room.members.length
+              memberCount: room.members.length,
+              members: room.members
             });
           }
 
@@ -172,6 +179,61 @@ app.prepare().then(() => {
             rooms.delete(roomCode);
             console.log(`Empty room deleted: ${roomCode}`);
           }
+        }
+      }
+    });
+
+    // Get members list
+    socket.on('get-members', ({ roomCode }) => {
+      const room = rooms.get(roomCode);
+      if (room) {
+        socket.emit('members-list', { members: room.members });
+      }
+    });
+
+    // Queue management
+    socket.on('add-to-queue', ({ roomCode, track }) => {
+      const room = rooms.get(roomCode);
+      if (room && room.host === socket.id) {
+        room.queue.push(track);
+        io.to(roomCode).emit('queue-updated', { queue: room.queue });
+        console.log(`Track added to queue in room ${roomCode}:`, track.name);
+      }
+    });
+
+    socket.on('remove-from-queue', ({ roomCode, index }) => {
+      const room = rooms.get(roomCode);
+      if (room && room.host === socket.id) {
+        if (index >= 0 && index < room.queue.length) {
+          const removed = room.queue.splice(index, 1);
+          io.to(roomCode).emit('queue-updated', { queue: room.queue });
+          console.log(`Track removed from queue in room ${roomCode}:`, removed[0]?.name);
+        }
+      }
+    });
+
+    socket.on('skip-next', ({ roomCode }) => {
+      const room = rooms.get(roomCode);
+      if (room && room.host === socket.id) {
+        if (room.queue.length > 0) {
+          const nextTrack = room.queue.shift(); // Remove and get first track
+          room.currentQueueIndex = -1; // Reset since we modified the queue
+          io.to(roomCode).emit('play-next-track', { track: nextTrack, queue: room.queue });
+          console.log(`Skipping to next track in room ${roomCode}:`, nextTrack.name);
+        }
+      }
+    });
+
+    socket.on('skip-previous', ({ roomCode, currentPosition }) => {
+      const room = rooms.get(roomCode);
+      if (room && room.host === socket.id) {
+        // If less than 3 seconds played, go to previous track, otherwise restart current
+        if (currentPosition < 3000) {
+          io.to(roomCode).emit('play-previous-track');
+          console.log(`Skipping to previous track in room ${roomCode}`);
+        } else {
+          io.to(roomCode).emit('restart-current-track');
+          console.log(`Restarting current track in room ${roomCode}`);
         }
       }
     });

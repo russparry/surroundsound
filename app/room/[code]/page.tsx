@@ -66,6 +66,12 @@ export default function RoomPage() {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
   const [showIOSWarning, setShowIOSWarning] = useState(false);
+  const [queue, setQueue] = useState<any[]>([]);
+  const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
+  const [members, setMembers] = useState<any[]>([]);
+  const [searchType, setSearchType] = useState<'track' | 'playlist' | 'artist'>('track');
+  const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
+  const [selectedArtist, setSelectedArtist] = useState<any>(null);
 
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -210,6 +216,20 @@ export default function RoomPage() {
         setCurrentTrack(state.track_window.current_track);
         setIsPlaying(!state.paused);
         setPosition(state.position);
+
+        // Auto-play next track when current track ends (host only)
+        if (isHost && state.position === 0 && state.paused && currentTrack && state.track_window.current_track?.id !== currentTrack.id) {
+          // Track has changed, likely ended
+          if (queue.length > 0) {
+            const nextTrack = queue[0];
+            handlePlayTrack(nextTrack);
+            // Remove from queue after playing
+            setQueue(prev => prev.slice(1));
+            if (socket) {
+              socket.emit('remove-from-queue', { roomCode, index: 0 });
+            }
+          }
+        }
       });
 
       player.connect().then((success: boolean) => {
@@ -235,26 +255,32 @@ export default function RoomPage() {
   useEffect(() => {
     if (!socket || !isConnected || !isReady) return;
 
+    const displayName = isHost ? 'Host' : `Guest-${Math.floor(Math.random() * 1000)}`;
+
     if (isHost) {
-      socket.emit('create-room', { roomCode, userId: 'user-' + Date.now() });
+      socket.emit('create-room', { roomCode, userId: 'user-' + Date.now(), displayName });
     } else {
-      socket.emit('join-room', { roomCode, userId: 'user-' + Date.now() });
+      socket.emit('join-room', { roomCode, userId: 'user-' + Date.now(), displayName });
     }
 
     socket.on('room-created', () => {
       console.log('Room created successfully');
     });
 
-    socket.on('room-joined', () => {
+    socket.on('room-joined', ({ queue: initialQueue, members: initialMembers }: any) => {
       console.log('Joined room successfully');
+      if (initialQueue) setQueue(initialQueue);
+      if (initialMembers) setMembers(initialMembers);
     });
 
-    socket.on('member-joined', ({ memberCount: count }: { memberCount: number }) => {
+    socket.on('member-joined', ({ memberCount: count, members: updatedMembers }: any) => {
       setMemberCount(count);
+      if (updatedMembers) setMembers(updatedMembers);
     });
 
-    socket.on('member-left', ({ memberCount: count }: { memberCount: number }) => {
+    socket.on('member-left', ({ memberCount: count, members: updatedMembers }: any) => {
       setMemberCount(count);
+      if (updatedMembers) setMembers(updatedMembers);
     });
 
     socket.on('host-left', () => {
@@ -416,12 +442,33 @@ export default function RoomPage() {
       }
     });
 
+    // Queue updates
+    socket.on('queue-updated', ({ queue: updatedQueue }: any) => {
+      setQueue(updatedQueue);
+    });
+
+    socket.on('play-next-track', ({ track, queue: updatedQueue }: any) => {
+      if (track) {
+        handlePlayTrack(track);
+        setQueue(updatedQueue);
+      }
+    });
+
+    socket.on('restart-current-track', async () => {
+      if (player) {
+        await player.seek(0);
+      }
+    });
+
     return () => {
       socket.off('play-command');
       socket.off('pause-command');
       socket.off('resume-command');
       socket.off('seek-command');
       socket.off('sync-position');
+      socket.off('queue-updated');
+      socket.off('play-next-track');
+      socket.off('restart-current-track');
     };
   }, [socket, player, deviceId, accessToken]);
 
@@ -446,12 +493,16 @@ export default function RoomPage() {
     }
   };
 
-  // Search for tracks
+  // Search for tracks, playlists, or artists
   const handleSearch = async () => {
     if (!searchQuery.trim() || !accessToken) return;
 
+    // Reset selected playlist/artist when searching
+    setSelectedPlaylist(null);
+    setSelectedArtist(null);
+
     const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=10`,
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}&limit=20`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -460,7 +511,54 @@ export default function RoomPage() {
     );
 
     const data = await response.json();
-    setSearchResults(data.tracks?.items || []);
+
+    if (searchType === 'track') {
+      setSearchResults(data.tracks?.items || []);
+    } else if (searchType === 'playlist') {
+      setSearchResults(data.playlists?.items || []);
+    } else if (searchType === 'artist') {
+      setSearchResults(data.artists?.items || []);
+    }
+  };
+
+  // Fetch playlist tracks
+  const handlePlaylistClick = async (playlist: any) => {
+    if (!accessToken) return;
+
+    const response = await fetch(
+      `https://api.spotify.com/v1/playlists/${playlist.id}/tracks`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    setSelectedPlaylist({
+      ...playlist,
+      tracks: data.items.map((item: any) => item.track).filter((t: any) => t)
+    });
+  };
+
+  // Fetch artist top tracks
+  const handleArtistClick = async (artist: any) => {
+    if (!accessToken) return;
+
+    const response = await fetch(
+      `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=US`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+    setSelectedArtist({
+      ...artist,
+      tracks: data.tracks || []
+    });
   };
 
   // Enable audio (for Safari autoplay restrictions)
@@ -535,12 +633,72 @@ export default function RoomPage() {
     }
   };
 
+  // Add to queue (host only)
+  const handleAddToQueue = (track: any) => {
+    if (!isHost || !socket) return;
+
+    socket.emit('add-to-queue', { roomCode, track });
+    setQueue(prev => [...prev, track]);
+  };
+
+  // Remove from queue (host only)
+  const handleRemoveFromQueue = (index: number) => {
+    if (!isHost || !socket) return;
+
+    socket.emit('remove-from-queue', { roomCode, index });
+    setQueue(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Skip to next track (host only)
+  const handleSkipNext = () => {
+    if (!isHost || !socket) return;
+
+    socket.emit('skip-next', { roomCode });
+  };
+
+  // Skip to previous track (host only)
+  const handleSkipPrevious = async () => {
+    if (!isHost || !socket || !player) return;
+
+    const state = await player.getCurrentState();
+    const currentPos = state?.position || 0;
+
+    socket.emit('skip-previous', { roomCode, currentPosition: currentPos });
+  };
+
+  // Add all tracks to queue
+  const handleAddAllToQueue = (tracks: any[]) => {
+    if (!isHost || !socket) return;
+
+    tracks.forEach(track => {
+      socket.emit('add-to-queue', { roomCode, track });
+    });
+    setQueue(prev => [...prev, ...tracks]);
+  };
+
   if (!isAuthenticated) {
     return <div>Redirecting...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600 p-6">
+    <div className={`min-h-screen p-6 transition-all duration-1000 ${
+      isPlaying
+        ? 'animated-gradient'
+        : 'bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600'
+    }`}>
+      <style jsx>{`
+        @keyframes gradient-wave {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        .animated-gradient {
+          background: linear-gradient(270deg, #9333ea, #ec4899, #3b82f6, #8b5cf6);
+          background-size: 400% 400%;
+          animation: gradient-wave 12s ease infinite;
+        }
+      `}</style>
       <div className="max-w-6xl mx-auto">
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-6">
@@ -562,16 +720,38 @@ export default function RoomPage() {
             </div>
           </div>
 
-          {/* Leave Button */}
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 px-6 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Leave
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Members List */}
+            {members.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-white/70 text-sm">Members:</span>
+                  <div className="flex -space-x-2">
+                    {members.map((member, idx) => (
+                      <div
+                        key={idx}
+                        className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold"
+                        title={member.displayName}
+                      >
+                        {member.displayName?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Leave Button */}
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 px-6 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Leave
+            </button>
+          </div>
         </div>
 
         {/* Connection Status - Subtle indicator */}
@@ -687,12 +867,33 @@ export default function RoomPage() {
             </div>
 
             {isHost && (
-              <div className="mt-6 flex gap-3">
+              <div className="mt-6 flex gap-3 items-center justify-center">
+                {/* Skip Previous Button */}
+                <button
+                  onClick={handleSkipPrevious}
+                  className="px-4 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous Track"
+                >
+                  <span className="text-2xl">⏮️</span>
+                </button>
+
+                {/* Play/Pause Toggle */}
                 <button
                   onClick={isPlaying ? handlePause : handleResume}
-                  className="px-6 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold"
+                  className="px-8 py-4 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold text-3xl"
+                  title={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? 'Pause' : 'Resume'}
+                  {isPlaying ? '⏸️' : '▶️'}
+                </button>
+
+                {/* Skip Next Button */}
+                <button
+                  onClick={handleSkipNext}
+                  disabled={queue.length === 0}
+                  className="px-4 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next Track"
+                >
+                  <span className="text-2xl">⏭️</span>
                 </button>
               </div>
             )}
@@ -714,6 +915,40 @@ export default function RoomPage() {
         {/* Search (host only) */}
         {isHost && (
           <div>
+            {/* Search Type Tabs */}
+            <div className="mb-4 flex gap-2">
+              <button
+                onClick={() => setSearchType('track')}
+                className={`px-4 py-2 rounded-xl font-semibold transition ${
+                  searchType === 'track'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                Tracks
+              </button>
+              <button
+                onClick={() => setSearchType('playlist')}
+                className={`px-4 py-2 rounded-xl font-semibold transition ${
+                  searchType === 'playlist'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                Playlists
+              </button>
+              <button
+                onClick={() => setSearchType('artist')}
+                className={`px-4 py-2 rounded-xl font-semibold transition ${
+                  searchType === 'artist'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20'
+                }`}
+              >
+                Artists
+              </button>
+            </div>
+
             {/* Search Bar */}
             <div className="mb-6">
               <input
@@ -721,19 +956,162 @@ export default function RoomPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search for songs..."
+                placeholder={`Search for ${searchType}s...`}
                 className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition text-lg"
               />
             </div>
 
+            {/* Queue Display */}
+            {queue.length > 0 && (
+              <div className="mb-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4">
+                <h3 className="text-white font-bold text-lg mb-3">Queue ({queue.length})</h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {queue.map((track, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-white/5 rounded-xl p-2">
+                      {track.album?.images?.[2] && (
+                        <img
+                          src={track.album.images[2].url}
+                          alt={track.name}
+                          className="w-10 h-10 rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white text-sm truncate">{track.name}</p>
+                        <p className="text-xs text-white/60 truncate">
+                          {track.artists?.map((a: any) => a.name).join(', ')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFromQueue(idx)}
+                        className="px-2 py-1 bg-red-500/50 hover:bg-red-500 text-white rounded-lg transition text-xs"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Search Results */}
-            {searchResults.length > 0 ? (
+            {selectedPlaylist ? (
+              // Playlist tracks view
+              <div>
+                <button
+                  onClick={() => setSelectedPlaylist(null)}
+                  className="mb-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition"
+                >
+                  ← Back to search
+                </button>
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    {selectedPlaylist.images?.[0] && (
+                      <img
+                        src={selectedPlaylist.images[0].url}
+                        alt={selectedPlaylist.name}
+                        className="w-24 h-24 rounded-xl"
+                      />
+                    )}
+                    <div>
+                      <h3 className="text-white font-bold text-2xl">{selectedPlaylist.name}</h3>
+                      <p className="text-white/70">{selectedPlaylist.tracks?.length} tracks</p>
+                      <button
+                        onClick={() => handleAddAllToQueue(selectedPlaylist.tracks)}
+                        className="mt-2 px-4 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
+                      >
+                        Add All to Queue
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {selectedPlaylist.tracks?.map((track: any) => (
+                    <div key={track.id} className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 flex items-center gap-3">
+                      {track.album?.images?.[2] && (
+                        <img src={track.album.images[2].url} alt={track.name} className="w-12 h-12 rounded-lg" />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-bold text-white">{track.name}</p>
+                        <p className="text-sm text-white/70">{track.artists?.map((a: any) => a.name).join(', ')}</p>
+                      </div>
+                      <button
+                        onClick={() => handlePlayTrack(track)}
+                        className="px-4 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-lg transition text-sm"
+                      >
+                        Play
+                      </button>
+                      <button
+                        onClick={() => handleAddToQueue(track)}
+                        className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition text-sm"
+                      >
+                        + Queue
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : selectedArtist ? (
+              // Artist tracks view
+              <div>
+                <button
+                  onClick={() => setSelectedArtist(null)}
+                  className="mb-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition"
+                >
+                  ← Back to search
+                </button>
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 mb-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    {selectedArtist.images?.[0] && (
+                      <img
+                        src={selectedArtist.images[0].url}
+                        alt={selectedArtist.name}
+                        className="w-24 h-24 rounded-full"
+                      />
+                    )}
+                    <div>
+                      <h3 className="text-white font-bold text-2xl">{selectedArtist.name}</h3>
+                      <p className="text-white/70">{selectedArtist.followers?.total.toLocaleString()} followers</p>
+                      <button
+                        onClick={() => handleAddAllToQueue(selectedArtist.tracks)}
+                        className="mt-2 px-4 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
+                      >
+                        Add All to Queue
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {selectedArtist.tracks?.map((track: any) => (
+                    <div key={track.id} className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-3 flex items-center gap-3">
+                      {track.album?.images?.[2] && (
+                        <img src={track.album.images[2].url} alt={track.name} className="w-12 h-12 rounded-lg" />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-bold text-white">{track.name}</p>
+                        <p className="text-sm text-white/70">{track.album?.name}</p>
+                      </div>
+                      <button
+                        onClick={() => handlePlayTrack(track)}
+                        className="px-4 py-2 bg-pink-500/80 hover:bg-pink-500 text-white rounded-lg transition text-sm"
+                      >
+                        Play
+                      </button>
+                      <button
+                        onClick={() => handleAddToQueue(track)}
+                        className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition text-sm"
+                      >
+                        + Queue
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : searchResults.length > 0 ? (
               <div className="space-y-3">
-                {searchResults.map((track) => (
+                {searchType === 'track' && searchResults.map((track) => (
                   <div
                     key={track.id}
-                    className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition-all cursor-pointer shadow-lg hover:shadow-xl"
-                    onClick={() => handlePlayTrack(track)}
+                    className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition-all shadow-lg hover:shadow-xl"
                   >
                     <div className="flex items-center gap-4">
                       {track.album?.images?.[2] && (
@@ -749,9 +1127,66 @@ export default function RoomPage() {
                           {track.artists.map((a: any) => a.name).join(', ')}
                         </p>
                       </div>
-                      <button className="px-6 py-3 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold opacity-0 group-hover:opacity-100">
+                      <button
+                        onClick={() => handlePlayTrack(track)}
+                        className="px-6 py-3 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold"
+                      >
                         Play
                       </button>
+                      <button
+                        onClick={() => handleAddToQueue(track)}
+                        className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl transition font-semibold"
+                      >
+                        + Queue
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {searchType === 'playlist' && searchResults.map((playlist) => (
+                  <div
+                    key={playlist.id}
+                    onClick={() => handlePlaylistClick(playlist)}
+                    className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition-all cursor-pointer shadow-lg hover:shadow-xl"
+                  >
+                    <div className="flex items-center gap-4">
+                      {playlist.images?.[0] && (
+                        <img
+                          src={playlist.images[0].url}
+                          alt={playlist.name}
+                          className="w-16 h-16 rounded-xl shadow-md"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-bold text-white text-lg">{playlist.name}</p>
+                        <p className="text-sm text-white/70">
+                          {playlist.tracks?.total} tracks by {playlist.owner?.display_name}
+                        </p>
+                      </div>
+                      <div className="text-white/50">→</div>
+                    </div>
+                  </div>
+                ))}
+                {searchType === 'artist' && searchResults.map((artist) => (
+                  <div
+                    key={artist.id}
+                    onClick={() => handleArtistClick(artist)}
+                    className="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition-all cursor-pointer shadow-lg hover:shadow-xl"
+                  >
+                    <div className="flex items-center gap-4">
+                      {artist.images?.[0] && (
+                        <img
+                          src={artist.images[0].url}
+                          alt={artist.name}
+                          className="w-16 h-16 rounded-full shadow-md"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-bold text-white text-lg">{artist.name}</p>
+                        <p className="text-sm text-white/70">
+                          {artist.followers?.total.toLocaleString()} followers
+                        </p>
+                      </div>
+                      <div className="text-white/50">→</div>
                     </div>
                   </div>
                 ))}
