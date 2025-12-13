@@ -584,10 +584,11 @@ export default function RoomPage() {
 
       const data = await response.json();
 
+      // Filter out null/undefined items that Spotify sometimes returns
       setMixedResults({
-        tracks: data.tracks?.items || [],
-        playlists: data.playlists?.items || [],
-        artists: data.artists?.items || [],
+        tracks: (data.tracks?.items || []).filter((t: any) => t && t.id && t.name),
+        playlists: (data.playlists?.items || []).filter((p: any) => p && p.id && p.name),
+        artists: (data.artists?.items || []).filter((a: any) => a && a.id && a.name),
       });
     } catch (error) {
       console.error('Search error:', error);
@@ -1335,17 +1336,23 @@ export default function RoomPage() {
                 {/* Mixed Results */}
                 <div className="space-y-3">
                   {/* Tracks */}
-                  {(resultFilter === 'all' || resultFilter === 'track') && mixedResults.tracks.map((track: any) => (
+                  {(resultFilter === 'all' || resultFilter === 'track') && mixedResults.tracks.filter((t: any) => t).map((track: any) => (
                     <div
                       key={track.id}
                       className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 transition"
                     >
-                      {track.album?.images?.[2] && (
+                      {track.album?.images?.[2]?.url ? (
                         <img
                           src={track.album.images[2].url}
                           alt={track.name}
                           className="w-14 h-14 rounded"
                         />
+                      ) : (
+                        <div className="w-14 h-14 rounded bg-white/10 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white/30" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
+                          </svg>
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-white truncate">{track.name}</p>
@@ -1353,7 +1360,7 @@ export default function RoomPage() {
                           {track.explicit && (
                             <span className="px-1 py-0.5 bg-white/20 rounded text-xs">E</span>
                           )}
-                          <span className="truncate">Song • {track.artists?.map((a: any) => a.name).join(', ')}</span>
+                          <span className="truncate">Song • {track.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist'}</span>
                         </div>
                       </div>
                       <button
@@ -1372,23 +1379,29 @@ export default function RoomPage() {
                   ))}
 
                   {/* Playlists */}
-                  {(resultFilter === 'all' || resultFilter === 'playlist') && mixedResults.playlists.map((playlist: any) => (
+                  {(resultFilter === 'all' || resultFilter === 'playlist') && mixedResults.playlists.filter((p: any) => p).map((playlist: any) => (
                     <div
                       key={playlist.id}
                       onClick={() => handlePlaylistClick(playlist)}
                       className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 cursor-pointer transition"
                     >
-                      {playlist.images?.[0] && (
+                      {playlist.images?.[0]?.url ? (
                         <img
                           src={playlist.images[0].url}
                           alt={playlist.name}
                           className="w-14 h-14 rounded"
                         />
+                      ) : (
+                        <div className="w-14 h-14 rounded bg-white/10 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white/30" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                          </svg>
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-white truncate">{playlist.name}</p>
                         <p className="text-sm text-white/60 truncate">
-                          Playlist • {playlist.owner?.display_name}
+                          Playlist • {playlist.owner?.display_name || 'Unknown'}
                         </p>
                       </div>
                       <svg className="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1398,18 +1411,24 @@ export default function RoomPage() {
                   ))}
 
                   {/* Artists */}
-                  {(resultFilter === 'all' || resultFilter === 'artist') && mixedResults.artists.map((artist: any) => (
+                  {(resultFilter === 'all' || resultFilter === 'artist') && mixedResults.artists.filter((a: any) => a).map((artist: any) => (
                     <div
                       key={artist.id}
                       onClick={() => handleArtistClick(artist)}
                       className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 cursor-pointer transition"
                     >
-                      {artist.images?.[0] && (
+                      {artist.images?.[0]?.url ? (
                         <img
                           src={artist.images[0].url}
                           alt={artist.name}
                           className="w-14 h-14 rounded-full"
                         />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white/30" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-white truncate flex items-center gap-2">
