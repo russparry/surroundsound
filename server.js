@@ -237,6 +237,15 @@ app.prepare().then(() => {
         }
       }
     });
+
+    // Restart current track (host explicitly clicked restart button)
+    socket.on('restart-current-track', ({ roomCode }) => {
+      const room = rooms.get(roomCode);
+      if (room && room.host === socket.id) {
+        io.to(roomCode).emit('restart-current-track');
+        console.log(`Host restarted current track in room ${roomCode}`);
+      }
+    });
   });
 
   httpServer

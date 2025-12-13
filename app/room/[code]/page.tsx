@@ -72,6 +72,13 @@ export default function RoomPage() {
   const [searchType, setSearchType] = useState<'track' | 'playlist' | 'artist'>('track');
   const [selectedPlaylist, setSelectedPlaylist] = useState<any>(null);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [likedSongs, setLikedSongs] = useState<any[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [playHistory, setPlayHistory] = useState<any[]>([]);
+  const [mixedResults, setMixedResults] = useState<any>({ tracks: [], playlists: [], artists: [] });
+  const [showHome, setShowHome] = useState(true);
+  const [resultFilter, setResultFilter] = useState<'all' | 'track' | 'playlist' | 'artist'>('all');
 
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const positionIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,6 +93,48 @@ export default function RoomPage() {
       console.log('⚠️ iOS device detected - Spotify Web Playback SDK has limited support');
       console.log('🔧 Recommendation: Use Safari instead of Chrome, or use desktop/Android');
       setShowIOSWarning(true);
+    }
+  }, []);
+
+  // Fetch user's playlists and liked songs (host only)
+  useEffect(() => {
+    if (!isHost || !accessToken) return;
+
+    const fetchUserData = async () => {
+      try {
+        // Fetch user's playlists
+        const playlistsResponse = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const playlistsData = await playlistsResponse.json();
+        setUserPlaylists(playlistsData.items || []);
+
+        // Fetch liked songs
+        const likedResponse = await fetch('https://api.spotify.com/v1/me/tracks?limit=50', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        const likedData = await likedResponse.json();
+        setLikedSongs(likedData.items?.map((item: any) => item.track) || []);
+
+        console.log('✓ Loaded user playlists:', playlistsData.items?.length);
+        console.log('✓ Loaded liked songs:', likedData.items?.length);
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [isHost, accessToken]);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('recent_searches');
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load recent searches');
+      }
     }
   }, []);
 
@@ -493,16 +542,22 @@ export default function RoomPage() {
     }
   };
 
-  // Search for tracks, playlists, or artists
+  // Search for tracks, playlists, AND artists together (mixed results like Spotify)
   const handleSearch = async () => {
     if (!searchQuery.trim() || !accessToken) return;
 
-    // Reset selected playlist/artist when searching
+    setShowHome(false);
     setSelectedPlaylist(null);
     setSelectedArtist(null);
 
+    // Save to recent searches
+    const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 5);
+    setRecentSearches(updated);
+    localStorage.setItem('recent_searches', JSON.stringify(updated));
+
+    // Fetch all types at once (like Spotify)
     const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}&limit=20`,
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track,playlist,artist&limit=10`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -512,13 +567,17 @@ export default function RoomPage() {
 
     const data = await response.json();
 
-    if (searchType === 'track') {
-      setSearchResults(data.tracks?.items || []);
-    } else if (searchType === 'playlist') {
-      setSearchResults(data.playlists?.items || []);
-    } else if (searchType === 'artist') {
-      setSearchResults(data.artists?.items || []);
-    }
+    setMixedResults({
+      tracks: data.tracks?.items || [],
+      playlists: data.playlists?.items || [],
+      artists: data.artists?.items || [],
+    });
+  };
+
+  // Clear recent searches
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('recent_searches');
   };
 
   // Fetch playlist tracks
@@ -598,6 +657,12 @@ export default function RoomPage() {
       return;
     }
 
+    // Add to play history
+    setPlayHistory(prev => {
+      const updated = [track, ...prev.filter(t => t.id !== track.id)].slice(0, 20);
+      return updated;
+    });
+
     // Schedule playback to start 2 seconds in the future for better sync
     const startTime = Date.now() + 2000; // 2 second countdown
 
@@ -615,6 +680,19 @@ export default function RoomPage() {
       position: 0,
       startTime, // All devices will start at this exact timestamp
     });
+  };
+
+  // Restart current track (host only) - syncs across all devices
+  const handleRestartTrack = () => {
+    if (!isHost || !socket || !currentTrack) return;
+
+    console.log('Restarting current track for all devices');
+    // Emit to all devices in room
+    socket.emit('restart-current-track', { roomCode });
+    // Also restart locally
+    if (player) {
+      player.seek(0);
+    }
   };
 
   // Pause (host only)
@@ -868,33 +946,69 @@ export default function RoomPage() {
 
             {isHost && (
               <div className="mt-6 flex gap-3 items-center justify-center">
+                {/* Restart Button */}
+                <button
+                  onClick={handleRestartTrack}
+                  className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition disabled:opacity-50"
+                  title="Restart Track"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+
                 {/* Skip Previous Button */}
                 <button
                   onClick={handleSkipPrevious}
-                  className="px-4 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition"
                   title="Previous Track"
                 >
-                  <span className="text-2xl">⏮️</span>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+                  </svg>
                 </button>
 
                 {/* Play/Pause Toggle */}
                 <button
                   onClick={isPlaying ? handlePause : handleResume}
-                  className="px-8 py-4 bg-pink-500/80 hover:bg-pink-500 text-white rounded-xl transition font-semibold text-3xl"
+                  className="p-4 bg-white hover:bg-white/90 text-black rounded-full transition shadow-lg"
                   title={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? '⏸️' : '▶️'}
+                  {isPlaying ? (
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  )}
                 </button>
 
                 {/* Skip Next Button */}
                 <button
                   onClick={handleSkipNext}
                   disabled={queue.length === 0}
-                  className="px-4 py-3 bg-white/20 hover:bg-white/30 border border-white/30 text-white rounded-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition disabled:opacity-30 disabled:cursor-not-allowed"
                   title="Next Track"
                 >
-                  <span className="text-2xl">⏭️</span>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16 18h2V6h-2zm-11-1l8.5-6L5 5z"/>
+                  </svg>
                 </button>
+
+                {/* Play from history */}
+                {playHistory.length > 0 && (
+                  <button
+                    onClick={() => handlePlayTrack(playHistory[0])}
+                    className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition"
+                    title="Play Previous Song"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -915,50 +1029,40 @@ export default function RoomPage() {
         {/* Search (host only) */}
         {isHost && (
           <div>
-            {/* Search Type Tabs */}
-            <div className="mb-4 flex gap-2">
+            {/* Top Navigation Bar */}
+            <div className="mb-6 flex items-center gap-4">
+              {/* Home Button */}
               <button
-                onClick={() => setSearchType('track')}
-                className={`px-4 py-2 rounded-xl font-semibold transition ${
-                  searchType === 'track'
-                    ? 'bg-pink-500 text-white'
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
-                }`}
+                onClick={() => {
+                  setShowHome(true);
+                  setSearchQuery('');
+                  setMixedResults({ tracks: [], playlists: [], artists: [] });
+                  setSelectedPlaylist(null);
+                  setSelectedArtist(null);
+                }}
+                className="p-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-full transition"
+                title="Home"
               >
-                Tracks
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
               </button>
-              <button
-                onClick={() => setSearchType('playlist')}
-                className={`px-4 py-2 rounded-xl font-semibold transition ${
-                  searchType === 'playlist'
-                    ? 'bg-pink-500 text-white'
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
-                }`}
-              >
-                Playlists
-              </button>
-              <button
-                onClick={() => setSearchType('artist')}
-                className={`px-4 py-2 rounded-xl font-semibold transition ${
-                  searchType === 'artist'
-                    ? 'bg-pink-500 text-white'
-                    : 'bg-white/10 text-white/70 hover:bg-white/20'
-                }`}
-              >
-                Artists
-              </button>
-            </div>
 
-            {/* Search Bar */}
-            <div className="mb-6">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder={`Search for ${searchType}s...`}
-                className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition text-lg"
-              />
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onFocus={() => setShowHome(false)}
+                  placeholder="What do you want to play?"
+                  className="w-full pl-12 pr-6 py-4 bg-[#2a2a2a] hover:bg-[#333] border-none rounded-full text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/20 transition text-sm"
+                />
+              </div>
             </div>
 
             {/* Queue Display */}
@@ -993,7 +1097,295 @@ export default function RoomPage() {
               </div>
             )}
 
-            {/* Search Results */}
+            {/* HOME SCREEN - User's Library */}
+            {showHome && !selectedPlaylist && !selectedArtist && mixedResults.tracks.length === 0 && (
+              <div className="space-y-6">
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <div className="bg-[#1a1a1a] rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-bold text-lg">Recent searches</h3>
+                      <button
+                        onClick={clearRecentSearches}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/70 text-sm rounded-full transition"
+                      >
+                        Clear recent searches
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {recentSearches.map((search, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSearchQuery(search);
+                            handleSearch();
+                          }}
+                          className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white transition"
+                        >
+                          {search}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Your Playlists */}
+                {userPlaylists.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-bold text-xl mb-4">Your Playlists</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {userPlaylists.slice(0, 8).map((playlist) => (
+                        <div
+                          key={playlist.id}
+                          onClick={() => handlePlaylistClick(playlist)}
+                          className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] p-4 rounded-xl cursor-pointer transition"
+                        >
+                          {playlist.images?.[0] && (
+                            <img
+                              src={playlist.images[0].url}
+                              alt={playlist.name}
+                              className="w-full aspect-square rounded-lg mb-3 shadow-lg"
+                            />
+                          )}
+                          <p className="font-semibold text-white text-sm truncate">{playlist.name}</p>
+                          <p className="text-white/60 text-xs mt-1">{playlist.tracks?.total} songs</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Liked Songs */}
+                {likedSongs.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-bold text-xl mb-4">Liked Songs</h3>
+                    <div className="space-y-2">
+                      {likedSongs.slice(0, 10).map((track) => (
+                        <div
+                          key={track.id}
+                          className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-3 flex items-center gap-3 transition"
+                        >
+                          {track.album?.images?.[2] && (
+                            <img src={track.album.images[2].url} alt={track.name} className="w-12 h-12 rounded" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-white text-sm truncate">{track.name}</p>
+                            <p className="text-white/60 text-xs truncate">
+                              {track.artists?.map((a: any) => a.name).join(', ')}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handlePlayTrack(track)}
+                            className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white hover:bg-white/90 text-black rounded-full transition text-sm font-semibold"
+                          >
+                            Play
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Play History */}
+                {playHistory.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-bold text-xl mb-4">Recently Played</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {playHistory.slice(0, 8).map((track, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => handlePlayTrack(track)}
+                          className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] p-4 rounded-xl cursor-pointer transition"
+                        >
+                          {track.album?.images?.[1] && (
+                            <img
+                              src={track.album.images[1].url}
+                              alt={track.name}
+                              className="w-full aspect-square rounded-lg mb-3 shadow-lg"
+                            />
+                          )}
+                          <p className="font-semibold text-white text-sm truncate">{track.name}</p>
+                          <p className="text-white/60 text-xs mt-1 truncate">
+                            {track.artists?.map((a: any) => a.name).join(', ')}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {userPlaylists.length === 0 && likedSongs.length === 0 && recentSearches.length === 0 && (
+                  <div className="bg-[#1a1a1a] rounded-3xl p-16 text-center">
+                    <svg className="w-20 h-20 text-white/30 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                    <p className="text-white/60 text-lg">Search for music to get started</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SEARCH RESULTS - Mixed (like Spotify) */}
+            {!showHome && mixedResults.tracks.length === 0 && mixedResults.playlists.length === 0 && mixedResults.artists.length === 0 && !selectedPlaylist && !selectedArtist && searchQuery && (
+              <div className="bg-[#1a1a1a] rounded-3xl p-16 text-center">
+                <svg className="w-20 h-20 text-white/30 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <p className="text-white/60 text-lg">No results found for "{searchQuery}"</p>
+              </div>
+            )}
+
+            {(mixedResults.tracks.length > 0 || mixedResults.playlists.length > 0 || mixedResults.artists.length > 0) && !selectedPlaylist && !selectedArtist && (
+              <div>
+                {/* Filter Buttons */}
+                <div className="mb-6 flex gap-2">
+                  <button
+                    onClick={() => setResultFilter('all')}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                      resultFilter === 'all'
+                        ? 'bg-white text-black'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {mixedResults.tracks.length > 0 && (
+                    <button
+                      onClick={() => setResultFilter('track')}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                        resultFilter === 'track'
+                          ? 'bg-white text-black'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      Songs
+                    </button>
+                  )}
+                  {mixedResults.playlists.length > 0 && (
+                    <button
+                      onClick={() => setResultFilter('playlist')}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                        resultFilter === 'playlist'
+                          ? 'bg-white text-black'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      Playlists
+                    </button>
+                  )}
+                  {mixedResults.artists.length > 0 && (
+                    <button
+                      onClick={() => setResultFilter('artist')}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                        resultFilter === 'artist'
+                          ? 'bg-white text-black'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      Artists
+                    </button>
+                  )}
+                </div>
+
+                {/* Mixed Results */}
+                <div className="space-y-3">
+                  {/* Tracks */}
+                  {(resultFilter === 'all' || resultFilter === 'track') && mixedResults.tracks.map((track: any) => (
+                    <div
+                      key={track.id}
+                      className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 transition"
+                    >
+                      {track.album?.images?.[2] && (
+                        <img
+                          src={track.album.images[2].url}
+                          alt={track.name}
+                          className="w-14 h-14 rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white truncate">{track.name}</p>
+                        <div className="flex items-center gap-2 text-sm text-white/60">
+                          {track.explicit && (
+                            <span className="px-1 py-0.5 bg-white/20 rounded text-xs">E</span>
+                          )}
+                          <span className="truncate">Song • {track.artists?.map((a: any) => a.name).join(', ')}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handlePlayTrack(track)}
+                        className="opacity-0 group-hover:opacity-100 px-6 py-2 bg-white hover:bg-white/90 text-black rounded-full transition font-semibold"
+                      >
+                        Play
+                      </button>
+                      <button
+                        onClick={() => handleAddToQueue(track)}
+                        className="opacity-0 group-hover:opacity-100 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition"
+                      >
+                        + Queue
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Playlists */}
+                  {(resultFilter === 'all' || resultFilter === 'playlist') && mixedResults.playlists.map((playlist: any) => (
+                    <div
+                      key={playlist.id}
+                      onClick={() => handlePlaylistClick(playlist)}
+                      className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 cursor-pointer transition"
+                    >
+                      {playlist.images?.[0] && (
+                        <img
+                          src={playlist.images[0].url}
+                          alt={playlist.name}
+                          className="w-14 h-14 rounded"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white truncate">{playlist.name}</p>
+                        <p className="text-sm text-white/60 truncate">
+                          Playlist • {playlist.owner?.display_name}
+                        </p>
+                      </div>
+                      <svg className="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  ))}
+
+                  {/* Artists */}
+                  {(resultFilter === 'all' || resultFilter === 'artist') && mixedResults.artists.map((artist: any) => (
+                    <div
+                      key={artist.id}
+                      onClick={() => handleArtistClick(artist)}
+                      className="group bg-[#1a1a1a] hover:bg-[#2a2a2a] rounded-xl p-4 flex items-center gap-4 cursor-pointer transition"
+                    >
+                      {artist.images?.[0] && (
+                        <img
+                          src={artist.images[0].url}
+                          alt={artist.name}
+                          className="w-14 h-14 rounded-full"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white truncate flex items-center gap-2">
+                          {artist.name}
+                          <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </p>
+                        <p className="text-sm text-white/60">Artist</p>
+                      </div>
+                      <svg className="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PLAYLIST/ARTIST DETAIL VIEW */}
             {selectedPlaylist ? (
               // Playlist tracks view
               <div>
