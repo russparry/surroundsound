@@ -724,12 +724,15 @@ export default function RoomPage() {
     }
   };
 
-  // Add to queue (host only)
+  // Add to queue (everyone can add)
   const handleAddToQueue = (track: any) => {
-    if (!isHost || !socket) return;
+    if (!socket) return;
 
     socket.emit('add-to-queue', { roomCode, track });
-    setQueue(prev => [...prev, track]);
+    // Only update local queue state if host (guests will get queue-updated event)
+    if (isHost) {
+      setQueue(prev => [...prev, track]);
+    }
   };
 
   // Remove from queue (host only)

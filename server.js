@@ -191,10 +191,10 @@ app.prepare().then(() => {
       }
     });
 
-    // Queue management
+    // Queue management (anyone in room can add to queue)
     socket.on('add-to-queue', ({ roomCode, track }) => {
       const room = rooms.get(roomCode);
-      if (room && room.host === socket.id) {
+      if (room) {
         room.queue.push(track);
         io.to(roomCode).emit('queue-updated', { queue: room.queue });
         console.log(`Track added to queue in room ${roomCode}:`, track.name);
