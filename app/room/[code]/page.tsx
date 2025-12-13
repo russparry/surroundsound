@@ -775,11 +775,7 @@ export default function RoomPage() {
   }
 
   return (
-    <div className={`min-h-screen p-6 transition-all duration-1000 ${
-      isPlaying
-        ? 'animated-gradient'
-        : 'bg-gradient-to-br from-purple-600 via-purple-500 to-blue-600'
-    }`}>
+    <div className={`min-h-screen p-6 animated-gradient ${isPlaying ? 'gradient-playing' : 'gradient-paused'}`}>
       <style jsx>{`
         @keyframes gradient-wave {
           0% { background-position: 0% 50%; }
@@ -791,6 +787,14 @@ export default function RoomPage() {
           background: linear-gradient(270deg, #9333ea, #ec4899, #3b82f6, #8b5cf6);
           background-size: 400% 400%;
           animation: gradient-wave 12s ease infinite;
+        }
+
+        .gradient-paused {
+          animation-play-state: paused;
+        }
+
+        .gradient-playing {
+          animation-play-state: running;
         }
       `}</style>
       <div className="max-w-6xl mx-auto">
