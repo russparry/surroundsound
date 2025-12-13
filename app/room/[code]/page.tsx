@@ -106,20 +106,30 @@ export default function RoomPage() {
         const playlistsResponse = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-        const playlistsData = await playlistsResponse.json();
-        setUserPlaylists(playlistsData.items || []);
+
+        if (playlistsResponse.ok) {
+          const playlistsData = await playlistsResponse.json();
+          setUserPlaylists(playlistsData.items || []);
+          console.log('✓ Loaded user playlists:', playlistsData.items?.length);
+        } else {
+          console.warn('Failed to fetch playlists:', playlistsResponse.status);
+        }
 
         // Fetch liked songs
         const likedResponse = await fetch('https://api.spotify.com/v1/me/tracks?limit=50', {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-        const likedData = await likedResponse.json();
-        setLikedSongs(likedData.items?.map((item: any) => item.track) || []);
 
-        console.log('✓ Loaded user playlists:', playlistsData.items?.length);
-        console.log('✓ Loaded liked songs:', likedData.items?.length);
+        if (likedResponse.ok) {
+          const likedData = await likedResponse.json();
+          setLikedSongs(likedData.items?.map((item: any) => item.track).filter((t: any) => t) || []);
+          console.log('✓ Loaded liked songs:', likedData.items?.length);
+        } else {
+          console.warn('Failed to fetch liked songs:', likedResponse.status);
+        }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
+        // Don't crash the app if user library fails to load
       }
     };
 
@@ -555,23 +565,35 @@ export default function RoomPage() {
     setRecentSearches(updated);
     localStorage.setItem('recent_searches', JSON.stringify(updated));
 
-    // Fetch all types at once (like Spotify)
-    const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track,playlist,artist&limit=10`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+    try {
+      // Fetch all types at once (like Spotify)
+      const response = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track,playlist,artist&limit=10`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Search failed:', response.status, response.statusText);
+        alert('Search failed. Please try again.');
+        return;
       }
-    );
 
-    const data = await response.json();
+      const data = await response.json();
 
-    setMixedResults({
-      tracks: data.tracks?.items || [],
-      playlists: data.playlists?.items || [],
-      artists: data.artists?.items || [],
-    });
+      setMixedResults({
+        tracks: data.tracks?.items || [],
+        playlists: data.playlists?.items || [],
+        artists: data.artists?.items || [],
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Search failed. Please try again.');
+      setMixedResults({ tracks: [], playlists: [], artists: [] });
+    }
   };
 
   // Clear recent searches
@@ -584,40 +606,62 @@ export default function RoomPage() {
   const handlePlaylistClick = async (playlist: any) => {
     if (!accessToken) return;
 
-    const response = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlist.id}/tracks`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    try {
+      const response = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlist.id}/tracks`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-    const data = await response.json();
-    setSelectedPlaylist({
-      ...playlist,
-      tracks: data.items.map((item: any) => item.track).filter((t: any) => t)
-    });
+      if (!response.ok) {
+        console.error('Failed to fetch playlist:', response.status);
+        alert('Failed to load playlist. Please try again.');
+        return;
+      }
+
+      const data = await response.json();
+      setSelectedPlaylist({
+        ...playlist,
+        tracks: data.items?.map((item: any) => item.track).filter((t: any) => t) || []
+      });
+    } catch (error) {
+      console.error('Playlist fetch error:', error);
+      alert('Failed to load playlist. Please try again.');
+    }
   };
 
   // Fetch artist top tracks
   const handleArtistClick = async (artist: any) => {
     if (!accessToken) return;
 
-    const response = await fetch(
-      `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=US`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    try {
+      const response = await fetch(
+        `https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=US`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-    const data = await response.json();
-    setSelectedArtist({
-      ...artist,
-      tracks: data.tracks || []
-    });
+      if (!response.ok) {
+        console.error('Failed to fetch artist:', response.status);
+        alert('Failed to load artist. Please try again.');
+        return;
+      }
+
+      const data = await response.json();
+      setSelectedArtist({
+        ...artist,
+        tracks: data.tracks || []
+      });
+    } catch (error) {
+      console.error('Artist fetch error:', error);
+      alert('Failed to load artist. Please try again.');
+    }
   };
 
   // Enable audio (for Safari autoplay restrictions)
