@@ -86,10 +86,64 @@ export async function getAccessToken(code: string): Promise<string> {
   const data = await response.json();
   console.log('Successfully got access token');
 
+  // Store both access token and refresh token
+  storeAccessToken(data.access_token);
+  if (data.refresh_token) {
+    localStorage.setItem('spotify_refresh_token', data.refresh_token);
+  }
+  localStorage.setItem('spotify_token_timestamp', Date.now().toString());
+
   // Clean up code verifier after successful exchange
   localStorage.removeItem('code_verifier');
 
   return data.access_token;
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('spotify_refresh_token');
+
+  if (!refreshToken) {
+    console.warn('No refresh token available');
+    return null;
+  }
+
+  console.log('Refreshing access token...');
+
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Token refresh failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('Successfully refreshed access token');
+
+    // Store new access token and update timestamp
+    storeAccessToken(data.access_token);
+    localStorage.setItem('spotify_token_timestamp', Date.now().toString());
+
+    // Update refresh token if a new one was provided
+    if (data.refresh_token) {
+      localStorage.setItem('spotify_refresh_token', data.refresh_token);
+    }
+
+    return data.access_token;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return null;
+  }
 }
 
 export function getStoredAccessToken(): string | null {
@@ -102,5 +156,7 @@ export function storeAccessToken(token: string) {
 
 export function clearAccessToken() {
   localStorage.removeItem('spotify_access_token');
+  localStorage.removeItem('spotify_refresh_token');
+  localStorage.removeItem('spotify_token_timestamp');
   localStorage.removeItem('code_verifier');
 }
